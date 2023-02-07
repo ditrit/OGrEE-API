@@ -343,7 +343,7 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 						}
 
 						if v["height"] == "" || v["height"] == nil {
-							return u.Message(false, "Invalid Height on payload"), false
+							return u.Message(false, "Object Height should be on payload"), false
 						}
 
 						if v["heightUnit"] == "" || v["heightUnit"] == nil {
@@ -385,7 +385,7 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 						}
 
 						if v["height"] == "" || v["height"] == nil {
-							return u.Message(false, "Invalid Height on payload"), false
+							return u.Message(false, "Object Height should be on payload"), false
 						}
 
 						if v["heightUnit"] == "" || v["heightUnit"] == nil {
@@ -435,7 +435,7 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 						}
 
 						if v["height"] == "" || v["height"] == nil {
-							return u.Message(false, "Invalid Height on payload"), false
+							return u.Message(false, "Object Height should be on payload"), false
 						}
 
 						if v["heightUnit"] == "" || v["heightUnit"] == nil {
@@ -473,11 +473,50 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 						}
 
 						if v["height"] == "" || v["height"] == nil {
-							return u.Message(false, "Invalid Height on payload"), false
+							return u.Message(false, "Object Height should be on payload"), false
 						}
 
 						if v["heightUnit"] == "" || v["heightUnit"] == nil {
 							return u.Message(false, "Device Height unit should be on the payload"), false
+						}
+
+						if !IsFloat(v["heightU"]) && !IsInt(v["heightU"]) &&
+							!IsString(v["heightU"]) {
+							return u.Message(false,
+								"Please provide a numerical value for heightU"), false
+						}
+
+						if IsString(v["heightU"]) {
+							if v["heightU"].(string) <= "0" {
+								return u.Message(false,
+									"heightU must be greater than 0"), false
+							}
+
+							if StrToFloat(v["heightU"].(string)) == 0 {
+								return u.Message(false,
+									"Please provide a numerical value for heightU"), false
+							}
+
+						}
+
+						if !IsString(v["sizeU"]) && !IsInt(v["sizeU"]) &&
+							!IsFloat(v["sizeU"]) {
+
+							return u.Message(false,
+								"Please provide a numerical string or"+
+									" int value for sizeU of the device"), false
+						}
+
+						if IsString(v["sizeU"]) {
+							if v["sizeU"].(string) <= "0" {
+								return u.Message(false,
+									"sizeU must be greater than 0"), false
+							}
+
+							if StrToFloat(v["sizeU"].(string)) == 0 {
+								return u.Message(false,
+									"Please provide a numerical value for sizeU"), false
+							}
 						}
 
 						if side, ok := v["side"]; ok {
@@ -487,6 +526,27 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 								msg := "The 'Side' value (if given) must be one of" +
 									"the given values: front, rear, frontflipped, rearflipped"
 								return u.Message(false, msg), false
+							}
+						}
+
+						//Need to ensure space on a rack for devices
+						if entity == u.DEVICE {
+							v := t["attributes"].(map[string]interface{})
+							if HasMapStringKey(v, "slot") {
+								if r, status := CheckRackSlotIsFree(v["slot"],
+									v["parentId"].(string)); !status {
+									return r, status
+								}
+
+							} else {
+								//Get Floats from sizeU and height U START
+								height := GetFloatFromStrOrInf(v["heightU"])
+								size := GetFloatFromStrOrInf(v["sizeU"])
+
+								if r, status := RackSpaceChecker(height,
+									size, t["parentId"].(string)); !status {
+									return r, status
+								}
 							}
 						}
 
@@ -803,7 +863,150 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 	return u.Message(true, "success"), true
 }
 
+// Ensures that the attrs of an entity are valid
+// This a func stub from the previous deprecated 'slotValidation'
+// branch. This is meant to encapsulate all the Entity checking
+// TODO: Complete this when the need arises
+func CheckEntityForAttrs(entity int, t map[string]interface{}) (map[string]interface{}, bool) {
+	return nil, false
+}
+
+// This will check if a device can be inserted in a rack at a certain 'U'
+// No consideration for devices other than 'U' units at this time
+func RackSpaceChecker(wantedHeight, wantedSize float64, pid string) (map[string]interface{}, bool) {
+	req := bson.M{"parentId": pid}
+	var rackHeight int
+	var rackHeightStr string
+
+	//Get the Rack block
+	parentID, _ := primitive.ObjectIDFromHex(pid)
+	rack, err1 := GetEntity(bson.M{"_id": parentID}, "rack")
+	if err1 != "" || rack == nil {
+		//The device already had a valid parent, so this
+		//case can only mean that it is a subdevice
+		return nil, true
+
+	}
+
+	//Get the rack height and ensure that the device is within
+	//the rack height range
+	if v, ok := rack["attributes"].(map[string]interface{})["height"]; !ok {
+		println("Error: A device in the server does not meet requirements")
+		return u.Message(false, "Internal error"), false
+	} else {
+		rackHeightStr = v.(string)
+		rackHeight, _ = strconv.Atoi(v.(string))
+	}
+
+	if rackHeight < int(wantedHeight) {
+		msg := "Error: The device cannot be placed in the rack" +
+			" because the desired height exceeds the rack height." +
+			"Rack height: " + rackHeightStr
+		return u.Message(false, msg), false
+	}
+
+	//Get the Devices of the Rack
+	devs, err := GetManyEntities("device", req, nil)
+	if devs == nil {
+		println("DEBUG err:", err)
+		return u.Message(false, "Internal Error"), false
+	}
+
+	for _, v := range devs {
+		var loc, size float64
+		var lInf, sInf interface{}
+
+		//Ensure every device is comparable
+		//we have to check that the attributes have valid sizeU and heightU
+		//if _, ok := CheckEntityForAttrs(u.DEVICE, v); !ok {
+		//	println("Error: A device in the server does meet requirements")
+		//	return u.Message(false, "Internal error"), false
+		//}
+
+		//Get the device size and height (loc)
+		lInf = v["attributes"].(map[string]interface{})["heightU"]
+		sInf = v["attributes"].(map[string]interface{})["sizeU"]
+		loc = GetFloatFromStrOrInf(lInf)
+		size = GetFloatFromStrOrInf(sInf)
+
+		//Check if insert location is within a device
+		//Check if the device crosses into another device
+		//If so, draw the rack in text and reject the request
+		if !((wantedHeight < loc && wantedHeight+wantedSize < loc) ||
+			(wantedHeight > (size+loc) && wantedHeight+wantedSize > (size+loc))) {
+
+			objSize := strconv.Itoa((int(size)))
+			objHeight := strconv.Itoa((int(loc)))
+			println("WANTED LOC:", wantedHeight, "SIZE:", wantedSize)
+			println("CURR   LOC:", loc, "SIZE:", size)
+
+			//Draw the current rack setup START
+			msg := "Error there is another device taking this space! Name: " +
+				v["name"].(string) + " HeightU: " +
+				objHeight + " SizeU: " + objSize
+
+			//Draw the current rack setup END
+			resp := u.Message(false, msg)
+			resp["rackArrangement"] = devs
+			return resp, false
+
+		}
+	}
+
+	return nil, true
+}
+
 // Auxillary Functions
+// Auxillary function
+func GetFloatFromStrOrInf(x interface{}) float64 {
+	if IsFloat(x) {
+		return x.(float64)
+	}
+	if IsInt(x) {
+		return float64(x.(int))
+
+	} else if IsString(x) { //Can only be string
+		return StrToFloat(x.(string))
+	}
+	//Error case
+	return -1
+}
+
+// If a user specified a slot for device creation this
+// will check if the slot is free
+func CheckRackSlotIsFree(value interface{}, pid string) (map[string]interface{}, bool) {
+	req := bson.M{"parentId": pid}
+	devs, err := GetManyEntities("device", req, nil)
+	if devs == nil {
+		println("DEBUG err:", err)
+		return nil, false
+	}
+	for i := range devs {
+		if devs[i]["attributes"].(map[string]interface{})["slot"] == value {
+			return u.Message(false,
+				"Error this slot is already taken by another device:"+devs[i]["name"].(string)), false
+		}
+	}
+	return nil, true
+}
+
+// Auxillary function converts string -> float64
+// Returns 0 on error
+func StrToFloat(x string) float64 {
+	value, e := strconv.ParseFloat(x, 64)
+	if e != nil {
+		return 0
+	}
+	return value
+}
+
+func HasMapStringKey(x map[string]interface{}, key string) bool {
+	if x[key] == nil || x[key] == "" {
+		return false
+	}
+	return true
+}
+
 func EnsureUnique(x []string) (string, bool) {
 	dict := map[string]int{}
 	for _, item := range x {
