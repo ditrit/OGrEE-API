@@ -243,9 +243,10 @@ var CreateEntity = func(w http.ResponseWriter, r *http.Request) {
 
 	//Check if category and endpoint match, only for objects
 	if i != u.OBJTMPL && i != u.BLDGTMPL && i != u.ROOMTMPL {
-		if entity["category"] != entStr {
+		//Stray objects don't always conform to the JSON standard
+		if entity["category"] != entStr && entStr != "stray_device" && entStr != "stray_sensor" {
 			w.WriteHeader(http.StatusBadRequest)
-			u.Respond(w, u.Message(false, "Category in request body does not correspond with endpoint"))
+			u.Respond(w, u.Message(false, "Category in request body does not correspond with desired object in endpoint"))
 			u.ErrLog("Cannot create invalid object", "CREATE "+mux.Vars(r)["entity"], "", r)
 			return
 		}
