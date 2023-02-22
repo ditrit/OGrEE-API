@@ -17,17 +17,15 @@
     "properties": {
         "category": {
             "type": "string",
-            "enum": [
-                "room"
-            ]
+            "pattern": "room"
         },
         "center": {
             "type": "array",
             "items": {
                 "type": "integer"
             },
-            "minItems": 3,
-            "maxItems": 3
+            "minItems": 2,
+            "maxItems": 2
         },
         "colors": {
             "type": "array",
@@ -43,7 +41,7 @@
                     },
                     "value": {
                         "type": "string",
-                        "$ref": "refs/color_pattern.json"
+                        "$ref": "refs/types.json#/definitions/color"
                     }
                 }
             }

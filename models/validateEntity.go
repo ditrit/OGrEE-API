@@ -115,6 +115,8 @@ func validateJsonSchema(entity int, t map[string]interface{}, schPrefix string) 
 	switch entity {
 	case u.AC, u.CABINET, u.PWRPNL:
 		schemaName = "base_schema.json"
+	case u.STRAYDEV, u.STRAYSENSOR:
+		schemaName = "stray_schema.json"
 	default:
 		schemaName = u.EntityToString(entity) + "_schema.json"
 	}

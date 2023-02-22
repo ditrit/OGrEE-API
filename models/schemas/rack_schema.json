@@ -30,7 +30,7 @@
         },
         "posXYUnit": {
           "type": "string",
-          "$ref": "refs/types.json#/definitions/metricImperialUnit"
+          "enum": ["m", "t", "f"]
         },
         "size": {
           "type": "string",

@@ -11,10 +11,6 @@
                 "temperature"
             ],
             "properties": {
-                "color": {
-                    "type": "string",
-                    "$ref": "refs/color_pattern.json"
-                },
                 "content": {
                     "type": "string"
                 },

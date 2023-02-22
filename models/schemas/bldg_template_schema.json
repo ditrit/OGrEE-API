@@ -10,6 +10,14 @@
             "type": "string",
             "enum": ["building"]
         },
+        "center": {
+            "type": "array",
+            "items": {
+                "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+        },
         "sizeWDHm": {
             "type": "array",
             "items": {
@@ -34,7 +42,8 @@
         "slug",
         "category",
         "sizeWDHm",
-        "vertices"
+        "vertices",
+        "center"
     ],
     "examples": [
         {
@@ -45,7 +54,8 @@
                 104,
                 5
             ],
-            "vertices": []
+            "vertices": [],
+            "center":[1,1]
         }
     ]
 }
