@@ -13,20 +13,20 @@
         "sizeWDHm": {
             "type": "array",
             "items": {
-                "type": "number",
-                "minItems": 3,
-                "maxItems": 3
-            }
+                "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
         },
         "vertices": {
             "type": "array",
             "items": {
                 "type": "array",
                 "items": {
-                    "type": "number",
-                    "minItems": 2,
-                    "maxItems": 2
-                }
+                    "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
             }
         }
     },

@@ -24,10 +24,10 @@
         "center": {
             "type": "array",
             "items": {
-                "type": "integer",
-                "minItems": 3,
-                "maxItems": 3
-            }
+                "type": "integer"
+            },
+            "minItems": 3,
+            "maxItems": 3
         },
         "colors": {
             "type": "array",
@@ -79,10 +79,10 @@
         "reservedArea": {
             "type": "array",
             "items": {
-                "type": "integer",
-                "minItems": 4,
-                "maxItems": 4
-            }
+                "type": "integer"
+            },
+            "minItems": 4,
+            "maxItems": 4
         },
         "separators": {
             "type": "array",
@@ -97,18 +97,18 @@
                     "startPosXYm": {
                         "type": "array",
                         "items": {
-                            "type": "number",
-                            "minItems": 2,
-                            "maxItems": 2
-                        }
+                            "type": "number"
+                        },
+                        "minItems": 2,
+                        "maxItems": 2
                     },
                     "endPosXYm": {
                         "type": "array",
                         "items": {
-                            "type": "number",
-                            "minItems": 2,
-                            "maxItems": 2
-                        }
+                            "type": "number"
+                        },
+                        "minItems": 2,
+                        "maxItems": 2
                     },
                     "type": {
                         "type": "string",
@@ -123,10 +123,10 @@
         "sizeWDHm": {
             "type": "array",
             "items": {
-                "type": "number",
-                "minItems": 3,
-                "maxItems": 3
-            }
+                "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
         },
         "slug": {
             "type": "string"
@@ -134,10 +134,10 @@
         "technicalArea": {
             "type": "array",
             "items": {
-                "type": "integer",
-                "minItems": 4,
-                "maxItems": 4
-            }
+                "type": "integer"
+            },
+            "minItems": 4,
+            "maxItems": 4
         },
         "tileAngle": {
             "type": "number"
@@ -177,10 +177,10 @@
             "items": {
                 "type": "array",
                 "items": {
-                    "type": "number",
-                    "minItems": 2,
-                    "maxItems": 2
-                }
+                    "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
             }
         }
     }

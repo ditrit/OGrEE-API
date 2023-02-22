@@ -85,18 +85,18 @@
                     "elemPos": {
                         "type": "array",
                         "items": {
-                            "type": "integer",
-                            "minItems": 3,
-                            "maxItems": 3
-                        }
+                            "type": "integer"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3
                     },
                     "elemSize": {
                         "type": "array",
                         "items": {
-                            "type": "integer",
-                            "minItems": 3,
-                            "maxItems": 3
-                        }
+                            "type": "integer"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3
                     },
                     "labelPos": {
                         "type": "string",
@@ -131,10 +131,10 @@
         "sizeWDHmm": {
             "type": "array",
             "items": {
-                "type": "number",
-                "minItems": 3,
-                "maxItems": 3
-            }
+                "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
         },
         "slots": {
             "type": "array",
@@ -168,18 +168,18 @@
                     "elemPos": {
                         "type": "array",
                         "items": {
-                            "type": "integer",
-                            "minItems": 3,
-                            "maxItems": 3
-                        }
+                            "type": "integer"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3
                     },
                     "elemSize": {
                         "type": "array",
                         "items": {
-                            "type": "integer",
-                            "minItems": 3,
-                            "maxItems": 3
-                        }
+                            "type": "integer"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3
                     },
                     "labelPos": {
                         "type": "string",
