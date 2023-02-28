@@ -8,11 +8,6 @@ import (
 	"testing"
 )
 
-var _ = (func() interface{} {
-	_testing = true
-	return nil
-}())
-
 func TestValidateJsonSchema(t *testing.T) {
 	testingEntities := []int{u.SITE, u.BLDG, u.ROOM, u.RACK, u.DEVICE, u.GROUP, u.BLDGTMPL}
 	for _, entInt := range testingEntities {
