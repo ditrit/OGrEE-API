@@ -17,8 +17,12 @@ import (
 
 // Database
 var db *mongo.Database
+var _testing = false
 
 func init() {
+	if _testing {
+		return
+	}
 
 	e := godotenv.Load()
 

@@ -63,13 +63,27 @@
                 "rotation": "30.5"
             },
             "category": "building",
-            "createdDate": "2023-01-26T10:46:40.612Z",
             "description": [
                 "building"
             ],
             "domain": "DEMO",
-            "id": "xxxx5a101ac5f3b6f313xxxx",
-            "lastUpdated": "2023-01-26T10:46:40.612Z",
+            "name": "B1",
+            "parentId": "xxxx592b1ac5f3b6f313xxxx"
+        },
+        {
+            "attributes": {
+                "height": 5,
+                "heightUnit": "m",
+                "posXY": "{\"x\":50 ,\"y\":0}",
+                "size": "{\"x\":49 ,\"y\":46.6}",
+                "sizeUnit": "m",
+                "rotation": "30.5"
+            },
+            "category": "building",
+            "description": [
+                "ERROR, NOT VALID JSON EXAMPLE"
+            ],
+            "domain": "DEMO",
             "name": "B1",
             "parentId": "xxxx592b1ac5f3b6f313xxxx"
         }

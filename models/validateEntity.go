@@ -149,11 +149,13 @@ func validateJsonSchema(entity int, t map[string]interface{}) (map[string]interf
 		schemaName = "base_schema.json"
 	case u.STRAYDEV, u.STRAYSENSOR:
 		schemaName = "stray_schema.json"
+	case u.BLDGTMPL, u.ROOMTMPL, u.OBJTMPL:
+		println("Attention: no JSON Schema validation for templates")
+		return nil, true
 	default:
 		schemaName = u.EntityToString(entity) + "_schema.json"
 	}
 
-	println(schemaName)
 	sch, err := c.Compile(schemaName)
 	if err != nil {
 		return u.Message(false, err.Error()), false
