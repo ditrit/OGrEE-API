@@ -9,7 +9,7 @@
       "properties": {
         "floorUnit": {
           "type": "string",
-          "enum": ["m", "t", "f"]
+          "enum": ["m", "f"]
         },
         "height": {
           "type": "string",
