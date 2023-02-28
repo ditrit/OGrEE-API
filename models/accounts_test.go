@@ -50,13 +50,13 @@ func TestValidateToReturnFalse(t *testing.T) {
 	var tst Account
 
 	//Case 1
-	if msi, _ := tst.Validate(); msi["message"] != "Email address is required" {
+	if msi, _ := tst.Validate(); msi["message"] != "A valid email address is required" {
 		t.Error("Gave empty email, but did not receive corresponding error")
 	}
 
 	//Case 2
 	tst.Email = "realcheat"
-	if msi, _ := tst.Validate(); msi["message"] != "Email address is required" {
+	if msi, _ := tst.Validate(); msi["message"] != "A valid email address is required" {
 		t.Error("Gave bad email, but did not receive corresponding error")
 	}
 
