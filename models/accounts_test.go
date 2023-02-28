@@ -4,7 +4,15 @@ import (
 	"testing"
 )
 
+var _ = (func() interface{} {
+	_testing = true
+	return nil
+}())
+
 func TestLoginToReturnFalse(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	//fmt.Println(res)
 	//fmt.Println(reflect.TypeOf(res["status"]))
 
@@ -34,8 +42,11 @@ func TestLoginToReturnFalse(t *testing.T) {
 	}
 }
 
-//Thoroughly test the Validate() function
+// Thoroughly test the Validate() function
 func TestValidateToReturnFalse(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	var tst Account
 
 	//Case 1
