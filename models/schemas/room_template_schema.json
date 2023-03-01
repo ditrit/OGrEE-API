@@ -4,16 +4,16 @@
     "type": "object",
     "required": [
         "category",
-        "center",
-        "colors",
         "axisOrientation",
-        "reservedArea",
-        "separators",
         "sizeWDHm",
         "slug",
-        "technicalArea",
-        "tiles"
+        "floorUnit"
     ],
+    "dependentRequired": {
+        "vertices": ["tileAngle", "center"],
+        "tileAngle": ["vertices", "center"],
+        "center": ["vertices", "tileAngle"]
+    },
     "properties": {
         "category": {
             "type": "string",
@@ -22,7 +22,7 @@
         "center": {
             "type": "array",
             "items": {
-                "type": "integer"
+                "type": "number"
             },
             "minItems": 2,
             "maxItems": 2
@@ -143,7 +143,7 @@
                     "maxItems": 2
                 },
                 "rotation": {
-                    "type": "string"
+                    "type": "number"
                 }
             }
         },
@@ -156,7 +156,8 @@
             "maxItems": 3
         },
         "slug": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-]+$"
         },
         "technicalArea": {
             "type": "array",
@@ -182,7 +183,8 @@
                 ],
                 "properties": {
                     "color": {
-                        "type": "string"
+                        "type": "string",
+                        "pattern": "^([0-9a-fA-F]{6})|(@[a-zA-Z0-9-]+)$"
                     },
                     "label": {
                         "type": "string"

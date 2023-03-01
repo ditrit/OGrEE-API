@@ -4,11 +4,12 @@
     "type": "object",
     "properties": {
         "slug": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-]+$"
         },
         "category": {
             "type": "string",
-            "enum": ["building"]
+            "pattern": "building"
         },
         "center": {
             "type": "array",
@@ -55,7 +56,50 @@
                 5
             ],
             "vertices": [],
-            "center":[1,1]
+            "center":[0,45]
+        },
+        {
+            "slug": "DEMO-b1",
+            "category": "building",
+            "sizeWDHm": [
+                42,
+                -104,
+                5.5
+            ],
+            "vertices": [[0,0]],
+            "center":[0,45]
+        },
+        {
+            "slug"     : "demo-b1",
+            "category" : "building",
+            "sizeWDHm" : [80,65,3],
+            "vertices" : [
+                [0,0],
+                [-50,0],
+                [-50,-3],
+                [-56,-3],
+                [-60,0.2],
+                [-61,-0.5],
+                [-64.5,2.7],
+                [-77.6,-10.3],
+                [-19.8,-62.8],
+                [-17.8,-62.8],
+                [0,-53]
+            ],
+            "center": [-30,-20]
+        },
+        {
+            "slug"     : "error-example",
+            "category" : "building",
+            "sizeWDHm" : [80,65],
+            "vertices" : [
+                [0,0],
+                [-50,0],
+                [-19.8],
+                [-17.8,-62.8],
+                [0,-53]
+            ],
+            "center": []
         }
     ]
 }

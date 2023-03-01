@@ -4,35 +4,30 @@
     "type": "object",
     "required": [
         "attributes",
-        "colors",
         "components",
         "description",
         "fbxModel",
         "sizeWDHmm",
         "slots",
-        "slug"
+        "slug",
+        "category"
     ],
     "properties": {
         "attributes": {
             "type": "object",
-            "required": [
-                "type"
-            ],
-            "properties": {
-                "model": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "vendor": {
+            "patternProperties": {
+                "^.*$": {
                     "type": "string"
                 }
-            }
+              },
+              "additionalProperties": false
         },
         "category": {
             "type": "string",
-            "enum": ["rack", "device"]
+            "enum": [
+                "rack",
+                "device"
+            ]
         },
         "colors": {
             "type": "array",
@@ -58,8 +53,6 @@
             "items": {
                 "type": "object",
                 "required": [
-                    "color",
-                    "elemOrient",
                     "elemPos",
                     "elemSize",
                     "labelPos",
@@ -68,39 +61,27 @@
                 ],
                 "properties": {
                     "attributes": {
-                        "type": "object",
-                        "properties": {
-                            "factor": {
-                                "type": "string"
-                            }
-                        }
+                        "$ref": "#/$defs/attributes"
                     },
                     "color": {
-                        "type": "string"
+                        "$ref": "#/$defs/color"
                     },
                     "elemOrient": {
                         "type": "string",
-                        "enum": ["horizontal", "vertical"]
+                        "enum": [
+                            "horizontal",
+                            "vertical",
+                            ""
+                        ]
                     },
                     "elemPos": {
-                        "type": "array",
-                        "items": {
-                            "type": "number"
-                        },
-                        "minItems": 3,
-                        "maxItems": 3
+                        "$ref": "#/$defs/elemPos"
                     },
                     "elemSize": {
-                        "type": "array",
-                        "items": {
-                            "type": "number"
-                        },
-                        "minItems": 3,
-                        "maxItems": 3
+                        "$ref": "#/$defs/elemSize"
                     },
                     "labelPos": {
-                        "type": "string",
-                        "enum": ["front", "rear", "frontrear", "top", "right", "left", "none"]
+                        "$ref": "#/$defs/labelPos"
                     },
                     "location": {
                         "type": "string"
@@ -136,66 +117,2407 @@
             "minItems": 3,
             "maxItems": 3
         },
-        "slots": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "required": [
-                    "color",
-                    "elemOrient",
-                    "elemPos",
-                    "elemSize",
-                    "labelPos",
-                    "location",
-                    "type"
-                ],
-                "properties": {
-                    "attributes": {
-                        "type": "object",
-                        "properties": {
-                            "factor": {
-                                "type": "string"
-                            }
+        "slug": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-]+$"
+        }
+    },
+    "if": {
+        "properties": {
+            "category": {
+                "const": "rack"
+            }
+        }
+    },
+    "then": {
+        "properties": {
+            "slots": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "elemOrient",
+                        "elemPos",
+                        "elemSize",
+                        "labelPos",
+                        "location",
+                        "type"
+                    ],
+                    "properties": {
+                        "elemOrient": {
+                            "type": "string",
+                            "enum": [
+                                "horizontal",
+                                "vertical"
+                            ]
+                        },
+                        "attributes": {
+                            "$ref": "#/$defs/attributes"
+                        },
+                        "color": {
+                            "$ref": "#/$defs/color"
+                        },
+                        
+                        "elemPos": {
+                            "$ref": "#/$defs/elemPos"
+                        },
+                        "elemSize": {
+                            "$ref": "#/$defs/elemSize"
+                        },
+                        "labelPos": {
+                            "$ref": "#/$defs/labelPos"
+                        },
+                        "location": {
+                            "type": "string"
+                        },
+                        "type": {
+                            "type": "string"
                         }
-                    },
-                    "color": {
-                        "type": "string"
-                    },
-                    "elemOrient": {
-                        "type": "string",
-                        "enum": ["horizontal", "vertical"]
-                    },
-                    "elemPos": {
-                        "type": "array",
-                        "items": {
-                            "type": "number"
-                        },
-                        "minItems": 3,
-                        "maxItems": 3
-                    },
-                    "elemSize": {
-                        "type": "array",
-                        "items": {
-                            "type": "number"
-                        },
-                        "minItems": 3,
-                        "maxItems": 3
-                    },
-                    "labelPos": {
-                        "type": "string",
-                        "enum": ["front", "rear", "frontrear", "top", "right", "left", "none"]
-                    },
-                    "location": {
-                        "type": "string"
-                    },
-                    "type": {
-                        "type": "string"
                     }
                 }
             }
-        },
-        "slug": {
-            "type": "string"
         }
-    }
+    },
+    "else": {
+        "properties": {
+            "slots": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "elemPos",
+                        "elemSize",
+                        "labelPos",
+                        "location",
+                        "type"
+                    ],
+                    "properties": {
+                        "elemOrient": {
+                            "type": "string",
+                            "enum": [
+                                "horizontal",
+                                "vertical",
+                                ""
+                            ]
+                        },
+                        "attributes": {
+                            "$ref": "#/$defs/attributes"
+                        },
+                        "color": {
+                            "$ref": "#/$defs/color"
+                        },
+                        
+                        "elemPos": {
+                            "$ref": "#/$defs/elemPos"
+                        },
+                        "elemSize": {
+                            "$ref": "#/$defs/elemSize"
+                        },
+                        "labelPos": {
+                            "$ref": "#/$defs/labelPos"
+                        },
+                        "location": {
+                            "type": "string"
+                        },
+                        "type": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "$defs": {
+        "attributes": {
+            "type": "object",
+            "properties": {
+                "factor": {
+                    "type": "string"
+                }
+            }
+        },
+        "color": {
+            "type": "string",
+            "pattern": "(^[0-9a-fA-F]{6}$)|(^@[a-zA-Z0-9-]+$)|(^$)"
+        },
+        "elemPos": {
+            "type": "array",
+            "items": {
+                "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+        },
+        "elemSize": {
+            "type": "array",
+            "items": {
+                "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+        },
+        "labelPos": {
+            "type": "string",
+            "enum": [
+                "front",
+                "rear",
+                "frontrear",
+                "top",
+                "right",
+                "left",
+                "none"
+            ]
+        }
+    },
+    "examples": [
+        {
+            "slug": "ibm-nx360m5",
+            "description": "NX360M5",
+            "category": "device",
+            "sizeWDHmm": [
+                216,
+                659,
+                41
+            ],
+            "fbxModel": "",
+            "attributes": {
+                "type": "blade",
+                "vendor": "IBM",
+                "model": "5456-HC1",
+                "ram order": "8,1,6,3,7,2,5,4 / 8,9,1,16,6,11,3,14,7,10,2,15,5,12,4,13"
+            },
+            "colors": [],
+            "components": [
+                {
+                    "location": "eth1imm",
+                    "type": "port",
+                    "elemOrient": "",
+                    "elemPos": [
+                        86,
+                        649,
+                        0
+                    ],
+                    "elemSize": [
+                        14,
+                        11,
+                        11
+                    ],
+                    "mandatory": "yes",
+                    "labelPos": "front",
+                    "color": "ffc0cb",
+                    "attributes": {
+                        "factor": "rj45"
+                    }
+                },
+                {
+                    "location": "eth2",
+                    "type": "port",
+                    "elemOrient": "",
+                    "elemPos": [
+                        104,
+                        649,
+                        0
+                    ],
+                    "elemSize": [
+                        14,
+                        11,
+                        11
+                    ],
+                    "mandatory": "yes",
+                    "labelPos": "front",
+                    "color": "ffc0cb",
+                    "attributes": {
+                        "factor": "rj45"
+                    }
+                },
+                {
+                    "location": "raidadapter",
+                    "type": "disk",
+                    "elemOrient": "",
+                    "elemPos": [
+                        152,
+                        72,
+                        10
+                    ],
+                    "elemSize": [
+                        54,
+                        78,
+                        5
+                    ],
+                    "mandatory": "yes",
+                    "labelPos": "top",
+                    "color": "ffff00",
+                    "attributes": {
+                        "factor": "onboard"
+                    }
+                }
+            ],
+            "slots": [
+                {
+                    "location": "cpu1",
+                    "type": "processor",
+                    "elemOrient": "",
+                    "elemPos": [
+                        68,
+                        343,
+                        0
+                    ],
+                    "elemSize": [
+                        97,
+                        97,
+                        30
+                    ],
+                    "mandatory": "yes",
+                    "labelPos": "top",
+                    "color": "ffff00",
+                    "attributes": {
+                        "factor": "LGA2011-R"
+                    }
+                },
+                {
+                    "location": "cpu2",
+                    "type": "processor",
+                    "elemOrient": "",
+                    "elemPos": [
+                        53,
+                        223,
+                        0
+                    ],
+                    "elemSize": [
+                        97,
+                        97,
+                        30
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "top",
+                    "color": "ffff00",
+                    "attributes": {
+                        "factor": "LGA2011-R"
+                    }
+                },
+                {
+                    "location": "dimm1",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        200,
+                        336,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm2",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        190,
+                        336,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm4",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        180,
+                        336,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm3",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        170,
+                        336,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm5",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        64,
+                        336,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm6",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        54,
+                        336,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm7",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        44,
+                        336,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm8",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        34,
+                        336,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "yes",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm9",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        190,
+                        194,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm10",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        180,
+                        194,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm11",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        170,
+                        194,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm12",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        160,
+                        194,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm13",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        45,
+                        194,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm14",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        35,
+                        194,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm15",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        25,
+                        194,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "dimm16",
+                    "type": "memory",
+                    "elemOrient": "",
+                    "elemPos": [
+                        15,
+                        194,
+                        0
+                    ],
+                    "elemSize": [
+                        1,
+                        133,
+                        31
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "left",
+                    "color": "007700",
+                    "attributes": {
+                        "factor": "LRDIMM"
+                    }
+                },
+                {
+                    "location": "slot2",
+                    "type": "adapter",
+                    "elemOrient": "",
+                    "elemPos": [
+                        153,
+                        493,
+                        18
+                    ],
+                    "elemSize": [
+                        51,
+                        167,
+                        18
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "front",
+                    "color": "C71585",
+                    "attributes": {
+                        "factor": "ml2"
+                    }
+                },
+                {
+                    "location": "slot1",
+                    "type": "adapter",
+                    "elemOrient": "",
+                    "elemPos": [
+                        29,
+                        485,
+                        18
+                    ],
+                    "elemSize": [
+                        101,
+                        175,
+                        18
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "front",
+                    "color": "C71585",
+                    "attributes": {
+                        "factor": "pci3x16fhhl"
+                    }
+                },
+                {
+                    "location": "eth1imm",
+                    "type": "port",
+                    "elemOrient": "",
+                    "elemPos": [
+                        86,
+                        649,
+                        0
+                    ],
+                    "elemSize": [
+                        14,
+                        11,
+                        11
+                    ],
+                    "mandatory": "yes",
+                    "labelPos": "front",
+                    "color": "ffc0cb",
+                    "attributes": {
+                        "factor": "rj45"
+                    }
+                },
+                {
+                    "location": "imm2",
+                    "type": "port",
+                    "elemOrient": "",
+                    "elemPos": [
+                        162,
+                        649,
+                        0
+                    ],
+                    "elemSize": [
+                        14,
+                        11,
+                        11
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "front",
+                    "color": "000000",
+                    "attributes": {
+                        "factor": "rj45"
+                    }
+                },
+                {
+                    "location": "eth2",
+                    "type": "port",
+                    "elemOrient": "",
+                    "elemPos": [
+                        104,
+                        649,
+                        0
+                    ],
+                    "elemSize": [
+                        14,
+                        11,
+                        11
+                    ],
+                    "mandatory": "yes",
+                    "labelPos": "front",
+                    "color": "ffc0cb",
+                    "attributes": {
+                        "factor": "rj45"
+                    }
+                },
+                {
+                    "location": "hdd182",
+                    "type": "disk",
+                    "elemOrient": "",
+                    "elemPos": [
+                        152,
+                        72,
+                        15
+                    ],
+                    "elemSize": [
+                        54,
+                        78,
+                        5
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "front",
+                    "color": "777777",
+                    "attributes": {
+                        "factor": "1.8hd"
+                    }
+                },
+                {
+                    "location": "hdd183",
+                    "type": "disk",
+                    "elemOrient": "",
+                    "elemPos": [
+                        152,
+                        72,
+                        20
+                    ],
+                    "elemSize": [
+                        54,
+                        78,
+                        5
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "front",
+                    "color": "777777",
+                    "attributes": {
+                        "factor": "1.8hd"
+                    }
+                },
+                {
+                    "location": "hdd184",
+                    "type": "disk",
+                    "elemOrient": "",
+                    "elemPos": [
+                        152,
+                        72,
+                        25
+                    ],
+                    "elemSize": [
+                        54,
+                        78,
+                        5
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "front",
+                    "color": "777777",
+                    "attributes": {
+                        "factor": "1.8hd"
+                    }
+                },
+                {
+                    "location": "hdd251",
+                    "type": "disk",
+                    "elemOrient": "",
+                    "elemPos": [
+                        136,
+                        50,
+                        8
+                    ],
+                    "elemSize": [
+                        70,
+                        100,
+                        7
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "front",
+                    "color": "777777",
+                    "attributes": {
+                        "factor": "2.5hd"
+                    }
+                },
+                {
+                    "location": "hdd252",
+                    "type": "disk",
+                    "elemOrient": "",
+                    "elemPos": [
+                        136,
+                        50,
+                        15
+                    ],
+                    "elemSize": [
+                        70,
+                        100,
+                        7
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "front",
+                    "color": "777777",
+                    "attributes": {
+                        "factor": "2.5hd"
+                    }
+                },
+                {
+                    "location": "hdd351",
+                    "type": "disk",
+                    "elemOrient": "",
+                    "elemPos": [
+                        104,
+                        3,
+                        4
+                    ],
+                    "elemSize": [
+                        102,
+                        147,
+                        26
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "front",
+                    "color": "777777",
+                    "attributes": {
+                        "factor": "3.5hd"
+                    }
+                }
+            ]
+        },
+        {
+            "slug": "ibm-ns1200",
+            "description": "NeXtScale ns1200",
+            "category": "device",
+            "sizeWDHmm": [
+                447,
+                914.5,
+                263.3
+            ],
+            "fbxModel": "",
+            "attributes": {
+                "type": "chassis",
+                "vendor": "IBM",
+                "model": "5456-HC1"
+            },
+            "colors": [],
+            "components": [
+                {
+                    "location": "midplane",
+                    "type": "chassis",
+                    "elemOrient": "",
+                    "elemPos": [
+                        0,
+                        230,
+                        0
+                    ],
+                    "elemSize": [
+                        450,
+                        30,
+                        270
+                    ],
+                    "labelPos": "top",
+                    "color": "FFFFFF",
+                    "attributes": {}
+                },
+                {
+                    "location": "fpc",
+                    "type": "mgmt",
+                    "elemOrient": "",
+                    "elemPos": [
+                        180,
+                        0,
+                        90
+                    ],
+                    "elemSize": [
+                        40,
+                        230,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "FF1493"
+                },
+                {
+                    "location": "psu01",
+                    "type": "power",
+                    "elemOrient": "",
+                    "elemPos": [
+                        225,
+                        0,
+                        0
+                    ],
+                    "elemSize": [
+                        45,
+                        230,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "EE82EE"
+                },
+                {
+                    "location": "fan01",
+                    "type": "fan",
+                    "elemOrient": "",
+                    "elemPos": [
+                        360,
+                        0,
+                        0
+                    ],
+                    "elemSize": [
+                        90,
+                        115,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "66CDAA"
+                },
+                {
+                    "location": "psu06",
+                    "type": "power",
+                    "elemOrient": "",
+                    "elemPos": [
+                        0,
+                        0,
+                        180
+                    ],
+                    "elemSize": [
+                        44,
+                        230,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "EE82EE"
+                },
+                {
+                    "location": "fan10",
+                    "type": "fan",
+                    "elemOrient": "",
+                    "elemPos": [
+                        46,
+                        0,
+                        180
+                    ],
+                    "elemSize": [
+                        88,
+                        115,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "66CDAA"
+                },
+                {
+                    "location": "fan09",
+                    "type": "fan",
+                    "elemOrient": "",
+                    "elemPos": [
+                        135,
+                        0,
+                        180
+                    ],
+                    "elemSize": [
+                        88,
+                        115,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "00ffAA"
+                },
+                {
+                    "location": "psu05",
+                    "type": "power",
+                    "elemOrient": "",
+                    "elemPos": [
+                        225,
+                        0,
+                        180
+                    ],
+                    "elemSize": [
+                        44,
+                        230,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "EE82EE"
+                },
+                {
+                    "location": "fan08",
+                    "type": "fan",
+                    "elemOrient": "",
+                    "elemPos": [
+                        270,
+                        0,
+                        180
+                    ],
+                    "elemSize": [
+                        88,
+                        115,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "66CDAA"
+                },
+                {
+                    "location": "fan07",
+                    "type": "fan",
+                    "elemOrient": "",
+                    "elemPos": [
+                        360,
+                        0,
+                        180
+                    ],
+                    "elemSize": [
+                        88,
+                        115,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "66CDAA"
+                },
+                {
+                    "location": "psu04",
+                    "type": "power",
+                    "elemOrient": "",
+                    "elemPos": [
+                        0,
+                        0,
+                        90
+                    ],
+                    "elemSize": [
+                        45,
+                        230,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "EE82EE"
+                },
+                {
+                    "location": "fan06",
+                    "type": "fan",
+                    "elemOrient": "",
+                    "elemPos": [
+                        45,
+                        0,
+                        90
+                    ],
+                    "elemSize": [
+                        90,
+                        115,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "66CDAA"
+                },
+                {
+                    "location": "psu03",
+                    "type": "power",
+                    "elemOrient": "",
+                    "elemPos": [
+                        225,
+                        0,
+                        90
+                    ],
+                    "elemSize": [
+                        45,
+                        230,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "EE82EE"
+                },
+                {
+                    "location": "fan05",
+                    "type": "fan",
+                    "elemOrient": "",
+                    "elemPos": [
+                        270,
+                        0,
+                        90
+                    ],
+                    "elemSize": [
+                        90,
+                        115,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "66CDAA"
+                },
+                {
+                    "location": "psu02",
+                    "type": "power",
+                    "elemOrient": "",
+                    "elemPos": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "elemSize": [
+                        45,
+                        230,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "EE82EE"
+                },
+                {
+                    "location": "fan04",
+                    "type": "fan",
+                    "elemOrient": "",
+                    "elemPos": [
+                        45,
+                        0,
+                        0
+                    ],
+                    "elemSize": [
+                        90,
+                        115,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "66CDAA"
+                },
+                {
+                    "location": "fan03",
+                    "type": "fan",
+                    "elemOrient": "",
+                    "elemPos": [
+                        135,
+                        0,
+                        0
+                    ],
+                    "elemSize": [
+                        90,
+                        115,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "66CDAA"
+                },
+                {
+                    "location": "fan02",
+                    "type": "fan",
+                    "elemOrient": "",
+                    "elemPos": [
+                        270,
+                        0,
+                        0
+                    ],
+                    "elemSize": [
+                        90,
+                        115,
+                        90
+                    ],
+                    "labelPos": "rear",
+                    "color": "66CDAA"
+                }
+            ],
+            "slots": [
+                {
+                    "location": "blade01",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        225,
+                        260,
+                        0
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade02",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        0,
+                        260,
+                        0
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade03",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        225,
+                        260,
+                        45
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade04",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        0,
+                        260,
+                        45
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade05",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        225,
+                        260,
+                        90
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade06",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        0,
+                        260,
+                        90
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade07",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        225,
+                        260,
+                        135
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade08",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        0,
+                        260,
+                        135
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade09",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        225,
+                        260,
+                        180
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade10",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        0,
+                        260,
+                        180
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade11",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        225,
+                        260,
+                        225
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                },
+                {
+                    "location": "blade12",
+                    "type": "blade",
+                    "elemOrient": "",
+                    "elemPos": [
+                        0,
+                        260,
+                        225
+                    ],
+                    "elemSize": [
+                        225,
+                        660,
+                        45
+                    ],
+                    "labelPos": "front",
+                    "color": ""
+                }
+            ],
+            "sensors": [
+                {
+                    "location": "sensor01",
+                    "elemPos": [
+                        "center",
+                        "center",
+                        "center"
+                    ],
+                    "elemSize": [
+                        20,
+                        20,
+                        20
+                    ]
+                }
+            ]
+        },
+        {
+            "slug": "ibm-rack42u",
+            "description": "IBM 42U Deep Rack",
+            "category": "rack",
+            "sizeWDHmm": [
+                605,
+                1200,
+                2003
+            ],
+            "fbxModel": "",
+            "attributes": {
+                "vendor": "IBM",
+                "model": "9360-4PX"
+            },
+            "colors": [
+                {
+                    "name": "color1",
+                    "value": "b0e0e6"
+                },
+                {
+                    "name": "color2",
+                    "value": "ffa500"
+                },
+                {
+                    "name": "color3",
+                    "value": "0000ff"
+                }
+            ],
+            "components": [],
+            "sensors": [
+                {
+                    "location": "se1",
+                    "elemPos": [
+                        "right",
+                        "rear",
+                        "upper"
+                    ],
+                    "elemSize": [
+                        50,
+                        20,
+                        20
+                    ]
+                },
+                {
+                    "location": "se3",
+                    "elemPos": [
+                        "right",
+                        "rear",
+                        300
+                    ],
+                    "elemSize": [
+                        50,
+                        20,
+                        20
+                    ]
+                },
+                {
+                    "location": "se4",
+                    "elemPos": [
+                        "right",
+                        "rear",
+                        1200
+                    ],
+                    "elemSize": [
+                        50,
+                        20,
+                        20
+                    ]
+                },
+                {
+                    "location": "se2",
+                    "elemPos": [
+                        "left",
+                        "front",
+                        "lower"
+                    ],
+                    "elemSize": [
+                        10
+                    ]
+                }
+            ],
+            "slots": [
+                {
+                    "location": "u01",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        44.45
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u02",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        88.9
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u03",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        133.35
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u04",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        177.8
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u05",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        222.25
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u06",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        266.7
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u07",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        311.15
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u08",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        355.6
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u09",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        400.05
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u10",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        444.5
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u11",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        488.95
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u12",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        533.4
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u13",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        577.85
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u14",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        622.3
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u15",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        666.75
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u16",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        711.2
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u17",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        755.65
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u18",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        800.1
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u19",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        844.55
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u20",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        889
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u21",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        933.45
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u22",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        977.9
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u23",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1022.35
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u24",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1066.8
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u25",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1111.25
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u26",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1155.7
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u27",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1200.15
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u28",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1244.6
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u29",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1289.05
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u30",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1333.5
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u31",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1377.95
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u32",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1422.4
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u33",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1466.85
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u34",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1511.3
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u35",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1555.75
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u36",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1600.2
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u37",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1644.65
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u38",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1689.1
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u39",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1733.55
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u40",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1778
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u41",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1822.45
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "frontrear",
+                    "color": "@color1"
+                },
+                {
+                    "location": "u42",
+                    "type": "u",
+                    "elemOrient": "horizontal",
+                    "elemPos": [
+                        58,
+                        51,
+                        1866.9
+                    ],
+                    "elemSize": [
+                        482.6,
+                        1138,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "top",
+                    "color": "@color1"
+                },
+                {
+                    "location": "l03",
+                    "type": "pdu",
+                    "elemOrient": "vertical",
+                    "elemPos": [
+                        3,
+                        259,
+                        177.8
+                    ],
+                    "elemSize": [
+                        444.5,
+                        670,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "top",
+                    "color": "@color2"
+                },
+                {
+                    "location": "l17",
+                    "type": "pdu",
+                    "elemOrient": "vertical",
+                    "elemPos": [
+                        3,
+                        259,
+                        800.1
+                    ],
+                    "elemSize": [
+                        444.5,
+                        670,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "top",
+                    "color": "@color2"
+                },
+                {
+                    "location": "l30",
+                    "type": "pdu",
+                    "elemOrient": "vertical",
+                    "elemPos": [
+                        3,
+                        259,
+                        1377.95
+                    ],
+                    "elemSize": [
+                        444.5,
+                        670,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "top",
+                    "color": "@color2"
+                },
+                {
+                    "location": "r17",
+                    "type": "pdu",
+                    "elemOrient": "vertical",
+                    "elemPos": [
+                        552.55,
+                        259,
+                        800.1
+                    ],
+                    "elemSize": [
+                        444.5,
+                        670,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "top",
+                    "color": "@color3"
+                },
+                {
+                    "location": "r03",
+                    "type": "pdu",
+                    "elemOrient": "vertical",
+                    "elemPos": [
+                        552.55,
+                        259,
+                        177.8
+                    ],
+                    "elemSize": [
+                        444.5,
+                        670,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "top",
+                    "color": "@color3"
+                },
+                {
+                    "location": "r30",
+                    "type": "pdu",
+                    "elemOrient": "vertical",
+                    "elemPos": [
+                        552.55,
+                        259,
+                        1377.95
+                    ],
+                    "elemSize": [
+                        444.5,
+                        670,
+                        44.45
+                    ],
+                    "mandatory": "no",
+                    "labelPos": "top",
+                    "color": "@color3"
+                }
+            ]
+        },
+        {
+            "slug"       : "error example",
+            "description": "IBM 42U Deep Rack",
+            "category"   : "rack",
+            "sizeWDHmm"  : [605 ,1200 ,2003],
+            "fbxModel"   : "",
+            "attributes" : {
+              "vendor"     : 76,
+              "model"      : "9360-4PX"
+            },
+            "colors"	   : [
+                { "name": "color1", "value": "b0e0e6"},
+                { "name": "color2", "value": "ffa500"},
+                { "name": "color3", "value": "0000ff"}
+            ],
+            "components" : [],
+            "sensors"  : [
+              { "location": "se1", "elemPos" : [ "right","rear", "upper" ],  "elemSize" : [ 50, 20, 20]  },
+              { "location": "se3", "elemPos" : [ "right","rear", 300 ],  "elemSize" : [ 50, 20, 20]  },
+              { "location": "se4", "elemPos" : [ "right","rear", 1200 ],  "elemSize" : [ 50, 20, 20]  },
+              { "location": "se2", "elemPos" : [ "left","front", "lower" ],  "elemSize" : [ 10 ] }
+            ],
+            "slots"      : [
+             { "location": "u01",  "type": "u",   "elemOrient": "banana", "elemPos" : [58,51,44.45],        "elemSize" : [482.6,1138,44.45], "mandatory":"no", "labelPos":"frontrear", "color": "@color1"},
+             { "location": "u02",  "type": "u",   "elemOrient": "", "elemPos" : [58,51,1,2],         "elemSize" : [482.6,1138], "mandatory":"no", "labelPos":"frontrear", "color": "@color1"},
+             { "location": "u03",  "type": "u",   "elemPos" : [58,51,133.35],       "elemSize" : [482.6,1138,44.45], "mandatory":"no", "labelPos":"banana", "color": "@color1"},
+             { "location": "u04",  "type": "u",   "elemOrient": "horizontal", "elemPos" : [58,51,177.8],        "elemSize" : [482.6,1138,44.45], "mandatory":"no", "labelPos":"frontrear", "color": "color1"}
+
+            ]
+        },
+        { 
+            "slug"        : "ERROR-example-123",
+            "description" : "NeXtScale ns1200",
+            "category"    : "device",
+            "sizeWDHmm"   : [447, 914.5, 263.3],
+            "fbxModel"    : "",
+            "attributes"  : {
+            "type"        : "chassis",
+            "vendor"      : "IBM",
+            "model"       : "5456-HC1"
+            },
+            "colors"      : [],
+            "components"  : [
+            { "location": "midplane", "type": "chassis", "elemOrient" : "", "elemPos" : [], "elemSize" : [450, 30,270], "labelPos"  : "top",  "color" : "FFFFFF",  "attributes":{} },
+            { "location": "fpc",      "type": "mgmt",    "elemOrient" : "banana", "elemPos" : [180,  0,90], "elemSize" : [40, 230, 90], "labelPos"  : "rear", "color" : "color" },
+            { "location": "psu01",    "type": "power", "elemPos" : [225,  0, 0], "elemSize" : [45, 230, 90], "labelPos"  : "rear", "color" : "EE82EE" },
+            { "location": "fan02",    "type": "fan",     "elemOrient" : "", "elemPos" : [270,0,0],    "elemSize" : [90, 115, 90], "labelPos" : "banana",  "color" : "" }
+                ],
+
+            "slots"  : [
+            { "location": "blade01",  "type": "blade",   "elemOrient" : "banana", "elemPos" : [225,260, 0],  "elemSize" : [225,660, 45], "labelPos" : "front" },
+            { "location": "blade02",  "type": "blade",   "elemPos" : [  0,260, 0],  "elemSize" : [225,660, 45], "labelPos" : "front" },
+            { "location": "blade03",  "type": "blade",   "elemOrient" : "", "elemPos" : [225,260,45],  "elemSize" : [225,660, 45], "labelPos" : "front", "color" : "" }
+                ]
+                    ,
+            "sensors"  : [
+            {	"location":"sensor01", "elemPos":["center", "center", "center"], "elemSize":[ 20,20,20] }
+                ]
+        }
+          
+    ]
 }
