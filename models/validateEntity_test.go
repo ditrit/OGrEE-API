@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-func TestValidateJsonSchema(t *testing.T) {
+func TestValidateJsonSchemaExamples(t *testing.T) {
 	// Test schemas examples
-	testingEntities := []int{u.SITE, u.BLDG, u.ROOM, u.RACK, u.DEVICE, u.GROUP, u.BLDGTMPL, u.OBJTMPL}
+	testingEntities := []int{u.SITE, u.BLDG, u.ROOM, u.RACK, u.DEVICE, u.GROUP, u.BLDGTMPL, u.OBJTMPL, u.ROOMTMPL}
 	for _, entInt := range testingEntities {
 		entStr := u.EntityToString(entInt)
 		println("*** Testing " + entStr)
@@ -21,13 +21,15 @@ func TestValidateJsonSchema(t *testing.T) {
 		if e != nil {
 			t.Error(e.Error())
 		}
-		json.Unmarshal(data, &obj) // only first example is good
+		json.Unmarshal(data, &obj) // only one example per schema
 		resp, ok := validateJsonSchema(entInt, obj["examples"].([]interface{})[0].(map[string]interface{}))
 		if !ok {
 			t.Errorf("Error validating json schema: %s", resp)
 		}
 	}
+}
 
+func TestValidateJsonSchema(t *testing.T) {
 	// Test test_data/OK json files
 	testDataDir := "schemas/test_data/OK/"
 	entries, err := os.ReadDir(testDataDir)
@@ -58,6 +60,7 @@ func TestValidateJsonSchema(t *testing.T) {
 }
 
 func TestErrorValidateJsonSchema(t *testing.T) {
+	// Test test_data/KO json files
 	expectedErrors := map[string][]string{
 		"site1":     {"missing properties: 'domain'", "/attributes/reservedColor does not match pattern"},
 		"building1": {"missing properties: 'posXYUnit'", "/attributes/height expected string, but got number"},
@@ -89,6 +92,15 @@ func TestErrorValidateJsonSchema(t *testing.T) {
 			"/sizeWDHm minimum 3 items required, but found 2 items",
 			"/vertices/2 minimum 2 items required, but found 1 items",
 			"/center minimum 2 items required, but found 0 items",
+		},
+		"room_template2": {
+			"/tiles/0 missing properties: 'location'",
+			"/axisOrientation value must be one of",
+			"/separators/0/type value must be one of",
+			"/vertices/4 minimum 2 items required, but found 1 items",
+			"/floorUnit value must be one of",
+			"property 'tileAngle' is required, if 'vertices' property exists",
+			"property 'center' is required, if 'vertices' property exists",
 		},
 	}
 
@@ -122,7 +134,7 @@ func TestErrorValidateJsonSchema(t *testing.T) {
 			} else {
 				for _, expected := range expectedErrors[testObjName] {
 					if !contains(resp["errors"].([]string), expected) {
-						t.Errorf("Validation errors do not correspond expected errors:\n%v\nGot:\n%v", expectedErrors[testObjName], resp["errors"].([]string))
+						t.Errorf("Validation errors do not correspond expected errors\n")
 					}
 				}
 			}
@@ -138,6 +150,7 @@ func contains(slice []string, elem string) bool {
 			return true
 		}
 	}
+	println("Expected error NOT FOUND: " + elem)
 	return false
 }
 
