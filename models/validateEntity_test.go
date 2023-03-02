@@ -2,14 +2,16 @@ package models
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
+	"os"
 	u "p3/utils"
+	"regexp"
 	"strings"
 	"testing"
 )
 
 func TestValidateJsonSchema(t *testing.T) {
+	// Test schemas examples
 	testingEntities := []int{u.SITE, u.BLDG, u.ROOM, u.RACK, u.DEVICE, u.GROUP, u.BLDGTMPL, u.OBJTMPL}
 	for _, entInt := range testingEntities {
 		entStr := u.EntityToString(entInt)
@@ -19,19 +21,38 @@ func TestValidateJsonSchema(t *testing.T) {
 		if e != nil {
 			t.Error(e.Error())
 		}
-		json.Unmarshal(data, &obj)
-		if entInt == u.BLDGTMPL || entInt == u.OBJTMPL { // 3 good examples
-			for i := 0; i < 3; i++ {
-				resp, ok := validateJsonSchema(entInt, obj["examples"].([]interface{})[i].(map[string]interface{}))
-				if !ok {
-					t.Errorf("Error validating json schema: %s", resp)
-				}
-			}
-		} else { // only first example is good
-			resp, ok := validateJsonSchema(entInt, obj["examples"].([]interface{})[0].(map[string]interface{}))
-			if !ok {
-				t.Errorf("Error validating json schema: %s", resp)
-			}
+		json.Unmarshal(data, &obj) // only first example is good
+		resp, ok := validateJsonSchema(entInt, obj["examples"].([]interface{})[0].(map[string]interface{}))
+		if !ok {
+			t.Errorf("Error validating json schema: %s", resp)
+		}
+	}
+
+	// Test test_data/OK json files
+	testDataDir := "schemas/test_data/OK/"
+	entries, err := os.ReadDir(testDataDir)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".json") {
+			t.Error("Not a JSON file")
+		}
+		testObjName := e.Name()[:len(e.Name())-5] // remove .json
+		entStr := regexp.MustCompile(`[0-9]+`).ReplaceAllString(testObjName, "")
+		entInt := u.EntityStrToInt(entStr)
+		if entInt < 0 {
+			t.Error("Unable to get entity from file name")
+		}
+		testObj := getMapFromJsonFile(testDataDir + e.Name())
+		if testObj == nil {
+			t.Error("Unable to convert json test file")
+		}
+
+		println("*** Testing " + testObjName)
+		resp, ok := validateJsonSchema(entInt, testObj)
+		if !ok {
+			t.Errorf("Error validating json schema: %s", resp)
 		}
 	}
 }
@@ -44,7 +65,7 @@ func TestErrorValidateJsonSchema(t *testing.T) {
 		"rack1":     {"/attributes/posXYZ does not match pattern", "/attributes/heightUnit value must be one of"},
 		"device1":   {"missing properties: 'template'", "/description expected array, but got string"},
 		"group1":    {"/attributes missing properties: 'content'"},
-		"obj_template3": {
+		"obj_template5": {
 			"/slug does not match pattern",
 			"/attributes/vendor expected string, but got number",
 			"if-then failed",
@@ -64,55 +85,53 @@ func TestErrorValidateJsonSchema(t *testing.T) {
 			"if-else failed",
 			"/slots/0/elemOrient value must be one of",
 		},
-		"bldg_template3": {
+		"bldg_template2": {
 			"/sizeWDHm minimum 3 items required, but found 2 items",
 			"/vertices/2 minimum 2 items required, but found 1 items",
 			"/center minimum 2 items required, but found 0 items",
 		},
 	}
-	testingEntities := []int{u.SITE, u.BLDG, u.ROOM, u.RACK, u.DEVICE, u.GROUP, u.BLDGTMPL, u.OBJTMPL}
-	for _, entInt := range testingEntities {
-		entStr := u.EntityToString(entInt)
-		println("*** Testing " + entStr)
-		var obj map[string]interface{}
-		data, e := ioutil.ReadFile("schemas/" + entStr + "_schema.json")
-		if e != nil {
-			t.Error(e.Error())
-		}
-		json.Unmarshal(data, &obj)
 
-		startExample := 1
-		endExample := 1
-		if entInt == u.BLDGTMPL {
-			startExample = 3
-			endExample = 3
-		} else if entInt == u.OBJTMPL {
-			startExample = 3
-			endExample = 4
+	testDataDir := "schemas/test_data/KO/"
+	entries, err := os.ReadDir(testDataDir)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".json") {
+			t.Error("Not a JSON file")
+		}
+		testObjName := e.Name()[:len(e.Name())-5] // remove .json
+		entStr := regexp.MustCompile(`[0-9]+`).ReplaceAllString(testObjName, "")
+		entInt := u.EntityStrToInt(entStr)
+		if entInt < 0 {
+			t.Error("Unable to get entity from file name")
+		}
+		testObj := getMapFromJsonFile(testDataDir + e.Name())
+		if testObj == nil {
+			t.Error("Unable to convert json test file")
 		}
 
-		for i := startExample; i <= endExample; i++ {
-			entObjName := fmt.Sprintf("%s%d", entStr, i)
-			println(entObjName)
-			resp, ok := validateJsonSchema(entInt, obj["examples"].([]interface{})[i].(map[string]interface{}))
-			if ok {
-				t.Errorf("Validated json schema that should have these errors: %v", expectedErrors[entObjName])
+		println("*** Testing " + testObjName)
+		resp, ok := validateJsonSchema(entInt, testObj)
+		if ok {
+			t.Errorf("Validated json schema that should have these errors: %v", expectedErrors[testObjName])
+		} else {
+			if len(resp["errors"].([]string)) != len(expectedErrors[testObjName]) {
+				t.Errorf("Validation errors do not correspond expected errors:\n%v\nGot:\n%v", expectedErrors[testObjName], resp["errors"].([]string))
 			} else {
-				if len(resp["errors"].([]string)) != len(expectedErrors[entObjName]) {
-					t.Errorf("Validation errors do not correspond expected errors:\n%v\nGot:\n%v", expectedErrors[entObjName], resp["errors"].([]string))
-				} else {
-					for _, expected := range expectedErrors[entObjName] {
-						if !contains(resp["errors"].([]string), expected) {
-							t.Errorf("Validation errors do not correspond expected errors:\n%v\nGot:\n%v", expectedErrors[entObjName], resp["errors"].([]string))
-						}
+				for _, expected := range expectedErrors[testObjName] {
+					if !contains(resp["errors"].([]string), expected) {
+						t.Errorf("Validation errors do not correspond expected errors:\n%v\nGot:\n%v", expectedErrors[testObjName], resp["errors"].([]string))
 					}
 				}
 			}
 		}
+
 	}
 }
 
-// helper function
+// helper functions
 func contains(slice []string, elem string) bool {
 	for _, e := range slice {
 		if strings.Contains(e, elem) {
@@ -120,4 +139,14 @@ func contains(slice []string, elem string) bool {
 		}
 	}
 	return false
+}
+
+func getMapFromJsonFile(file string) map[string]interface{} {
+	var obj map[string]interface{}
+	data, e := ioutil.ReadFile(file)
+	if e != nil {
+		return nil
+	}
+	json.Unmarshal(data, &obj)
+	return obj
 }
