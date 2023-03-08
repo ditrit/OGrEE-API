@@ -1345,7 +1345,13 @@ var GetHierarchyByName = func(w http.ResponseWriter, r *http.Request) {
 
 	println("The limit is: ", limit)
 
-	data, e1 := models.GetEntity(bson.M{"hierarchyName": name}, entity)
+	var req primitive.M
+	if entity == "tenant" {
+		req = bson.M{"name": name}
+	} else {
+		req = bson.M{"hierarchyName": name}
+	}
+	data, e1 := models.GetEntity(req, entity)
 	if limit >= 1 && e1 == "" {
 		data["children"], e1 = models.GetHierarchyByName(entity, name, limit)
 	}
