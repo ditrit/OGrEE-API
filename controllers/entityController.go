@@ -511,18 +511,9 @@ var DeleteEntity = func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(entity, "template") {
 			v, _ = models.DeleteEntityManual(entity, bson.M{"slug": name})
 		} else {
-			filter := bson.M{"hierarchyName": name} // use hierarchyName
-			if entity == "stray_device" || entity == "stray_sensor" {
-				filter = bson.M{"name": name} // except for stray
-			}
+			//use hierarchyName
+			v = models.DeleteEntityByName(entity, name)
 
-			sd, _ := models.GetEntity(filter, entity)
-			if sd == nil {
-				w.WriteHeader(http.StatusNotFound)
-				u.Respond(w, u.Message(false, "Error object not found"))
-				return
-			}
-			v, _ = models.DeleteEntity(entity, sd["id"].(primitive.ObjectID))
 		}
 
 	case e && !e2: // DELETE by id
@@ -735,11 +726,9 @@ var UpdateEntity = func(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch {
-	case e2: // Update with name/slug/hierarchyName
+	case e2: // Update with slug/hierarchyName
 		var req bson.M
-		if entity == "stray_device" || entity == "stray_sensor" {
-			req = bson.M{"name": name}
-		} else if strings.Contains(entity, "template") {
+		if strings.Contains(entity, "template") {
 			req = bson.M{"slug": name}
 		} else {
 			req = bson.M{"hierarchyName": name}
@@ -1354,10 +1343,9 @@ var GetHierarchyByName = func(w http.ResponseWriter, r *http.Request) {
 
 	println("The limit is: ", limit)
 
-	entInt := u.EntityStrToInt(entity)
 	data, e1 := models.GetEntity(bson.M{"hierarchyName": name}, entity)
 	if limit >= 1 && e1 == "" {
-		data["children"], e1 = models.GetHierarchyByName(entity, name, entInt+1, limit)
+		data["children"], e1 = models.GetHierarchyByName(entity, name, limit)
 	}
 
 	if data == nil {

@@ -253,6 +253,28 @@ func GetStats() map[string]interface{} {
 	return ans
 }
 
+func DeleteEntityByName(entity string, name string) map[string]interface{} {
+	resp, err := DeleteEntityManual(entity, bson.M{"hierarchyName": name})
+	if err != "" {
+		// Unable to delete given object
+		return resp
+	} else {
+		// Delete possible children
+		rangeEntities := getChildrenCollections(u.STRAYSENSOR, entity)
+		for _, childEnt := range rangeEntities {
+			childEntName := u.EntityToString(childEnt)
+			pattern := primitive.Regex{Pattern: name, Options: ""}
+
+			ctx, cancel := u.Connect()
+			GetDB().Collection(childEntName).DeleteMany(ctx,
+				bson.M{"hierarchyName": pattern})
+			defer cancel()
+		}
+	}
+
+	return u.Message(true, "success")
+}
+
 func DeleteEntityManual(entity string, req bson.M) (map[string]interface{}, string) {
 	//Finally delete the Entity
 	ctx, cancel := u.Connect()
@@ -364,7 +386,7 @@ func UpdateEntity(ent string, req bson.M, t *map[string]interface{}, isPatch boo
 	(*t)["createdDate"] = oldObj["createdDate"]
 
 	ctx, cancel := u.Connect()
-	if isPatch == true {
+	if isPatch {
 
 		msg, ok := ValidatePatch(u.EntityStrToInt(ent), *t)
 		if !ok {
@@ -611,35 +633,12 @@ func GetEntityUsingAncestorNames(ent string, id primitive.ObjectID, ancestry []m
 	return x, ""
 }
 
-func GetHierarchyByName(entity, hierarchyName string, startEnt, limit int) ([]map[string]interface{}, string) {
+func GetHierarchyByName(entity, hierarchyName string, limit int) ([]map[string]interface{}, string) {
 	allChildren := map[string]interface{}{}
 	hierarchy := make(map[string][]string)
 
 	// Define in which collections we'll search
-	rangeEntities := []int{}
-	endEnt := startEnt + limit
-	if entity == "device" {
-		// device special case
-		startEnt = u.DEVICE
-		endEnt = u.DEVICE
-	} else if entity == "stray_device" {
-		// stray device special casa
-		startEnt = u.STRAYDEV
-		endEnt = u.STRAYDEV
-	} else if endEnt >= u.DEVICE {
-		// include AC, CABINET, CORRIDOR, PWRPNL and GROUP
-		// beacause of ROOM and RACK possible children
-		// but no need to search further than group
-		endEnt = u.GROUP
-	}
-	for i := startEnt; i <= endEnt; i++ {
-		rangeEntities = append(rangeEntities, i)
-	}
-	if startEnt == u.ROOM && endEnt == u.RACK {
-		// ROOM limit=1 special case should include extra
-		// possible ROOM children avoiding DEVICE (big collection)
-		rangeEntities = append(rangeEntities, u.CORRIDOR, u.CABINET, u.PWRPNL, u.GROUP)
-	}
+	rangeEntities := getChildrenCollections(limit, entity)
 
 	// Get children from all given collections
 	for _, checkEnt := range rangeEntities {
@@ -671,6 +670,37 @@ func recursivelyGetChildrenFromMaps(hierarchyName string, hierarchy map[string][
 		children = append(children, child)
 	}
 	return children
+}
+
+func getChildrenCollections(limit int, parentEntStr string) []int {
+	// Define in which collections we'll search
+	rangeEntities := []int{}
+	startEnt := u.EntityStrToInt(parentEntStr) + 1
+	endEnt := startEnt + limit
+	if parentEntStr == "device" {
+		// device special case
+		startEnt = u.DEVICE
+		endEnt = u.DEVICE
+	} else if parentEntStr == "stray_device" {
+		// stray device special casa
+		startEnt = u.STRAYDEV
+		endEnt = u.STRAYDEV
+	} else if endEnt >= u.DEVICE {
+		// include AC, CABINET, CORRIDOR, PWRPNL and GROUP
+		// beacause of ROOM and RACK possible children
+		// but no need to search further than group
+		endEnt = u.GROUP
+	}
+	for i := startEnt; i <= endEnt; i++ {
+		rangeEntities = append(rangeEntities, i)
+	}
+	if startEnt == u.ROOM && endEnt == u.RACK {
+		// ROOM limit=1 special case should include extra
+		// possible ROOM children avoiding DEVICE (big collection)
+		rangeEntities = append(rangeEntities, u.CORRIDOR, u.CABINET, u.PWRPNL, u.GROUP)
+	}
+
+	return rangeEntities
 }
 
 func GetEntitiesUsingTenantAsAncestor(ent, id string, ancestry []map[string]string) ([]map[string]interface{}, string) {
