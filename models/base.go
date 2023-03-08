@@ -34,7 +34,7 @@ func init() {
 	dbName := os.Getenv("db")
 
 	println("USER:", user)
-	println("PASS:", dbName)
+	println("PASS:", pass)
 
 	if dbHost == "" {
 		dbHost = "localhost"

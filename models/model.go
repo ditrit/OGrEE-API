@@ -254,7 +254,13 @@ func GetStats() map[string]interface{} {
 }
 
 func DeleteEntityByName(entity string, name string) map[string]interface{} {
-	resp, err := DeleteEntityManual(entity, bson.M{"hierarchyName": name})
+	var req primitive.M
+	if entity == "tenant" {
+		req = bson.M{"name": name}
+	} else {
+		req = bson.M{"hierarchyName": name}
+	}
+	resp, err := DeleteEntityManual(entity, req)
 	if err != "" {
 		// Unable to delete given object
 		return resp
@@ -416,6 +422,10 @@ func UpdateEntity(ent string, req bson.M, t *map[string]interface{}, isPatch boo
 		}
 	}
 
+	if ent == "tenant" && oldObj["name"] != (*t)["name"] {
+		propagateParentNameChange(ctx, oldObj["name"].(string),
+			(*t)["name"].(string), u.EntityStrToInt(ent))
+	}
 	if oldObj["hierarchyName"] != (*t)["hierarchyName"] {
 		propagateParentNameChange(ctx, oldObj["hierarchyName"].(string),
 			(*t)["hierarchyName"].(string), u.EntityStrToInt(ent))

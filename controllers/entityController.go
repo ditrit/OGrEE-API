@@ -730,6 +730,8 @@ var UpdateEntity = func(w http.ResponseWriter, r *http.Request) {
 		var req bson.M
 		if strings.Contains(entity, "template") {
 			req = bson.M{"slug": name}
+		} else if entity == "tenant" {
+			req = bson.M{"name": name}
 		} else {
 			req = bson.M{"hierarchyName": name}
 		}
