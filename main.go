@@ -79,6 +79,9 @@ func main() {
 		controllers.GetCompleteHierarchy).Methods("GET", "OPTIONS", "HEAD")
 
 	// ------ GET ------ //
+	router.HandleFunc("/api/objects/{name}",
+		controllers.GetGenericObject).Methods("GET", "HEAD", "OPTIONS")
+
 	//GET ENTITY HIERARCHY
 	//This matches ranged Tenant Hierarchy
 	router.NewRoute().PathPrefix("/api/{entity}/{id:[a-zA-Z0-9]{24}}/all").

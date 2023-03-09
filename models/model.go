@@ -58,6 +58,33 @@ func CreateEntity(entity int, t map[string]interface{}) (map[string]interface{},
 	return resp, ""
 }
 
+// GetObjectByName: search for hierarchyName in all possible collections
+func GetObjectByName(hierarchyName string) (map[string]interface{}, string) {
+	var resp map[string]interface{}
+	// Get possible collections for this name
+	rangeEntities := u.HierachyNameToEntity(hierarchyName)
+
+	// Search each collection
+	for _, entity := range rangeEntities {
+		req := bson.M{"hierarchyName": hierarchyName}
+		if entity == u.TENANT {
+			req = bson.M{"name": hierarchyName}
+		}
+		entityStr := u.EntityToString(entity)
+		data, _ := GetEntity(req, entityStr)
+		if data != nil {
+			resp = data
+			break
+		}
+	}
+
+	if resp != nil {
+		return resp, ""
+	} else {
+		return nil, "Unable to find object"
+	}
+}
+
 func GetEntity(req bson.M, ent string) (map[string]interface{}, string) {
 	t := map[string]interface{}{}
 

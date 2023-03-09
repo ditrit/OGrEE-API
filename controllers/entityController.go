@@ -206,6 +206,81 @@ var CreateEntity = func(w http.ResponseWriter, r *http.Request) {
 	u.Respond(w, resp)
 }
 
+// swagger:operation GET /api/objects/{name} objects GetObject
+// Gets an Object from the system.
+// The hierarchyName must be provided in the URL parameter
+// ---
+// produces:
+// - application/json
+// parameters:
+//   - name: name
+//     in: query
+//     description: 'hierarchyName of the object'
+//
+// responses:
+//
+//	'200':
+//	    description: 'Found. A response body will be returned with
+//         a meaningful message.'
+//	'404':
+//	    description: Not Found. An error message will be returned.
+
+// swagger:operation OPTIONS /api/objects/{name} objects ObjectOptions
+// Displays possible operations for the resource in response header.
+// ---
+// produces:
+// - application/json
+// parameters:
+//   - name: name
+//     in: query
+//     description: 'hierarchyName of the object'
+//
+// responses:
+//
+//	'200':
+//	    description: 'Found. A response header will be returned with
+//	    possible operations.'
+//	'400':
+//	    description: Bad request. An error message will be returned.
+//	'404':
+//	    description: Not Found. An error message will be returned.
+var GetGenericObject = func(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("******************************************************")
+	fmt.Println("FUNCTION CALL: 	 GetEntity ")
+	fmt.Println("******************************************************")
+	DispRequestMetaData(r)
+	var data map[string]interface{}
+	var e1 string
+
+	var resp map[string]interface{}
+
+	name, e := mux.Vars(r)["name"]
+	if e {
+		data, e1 = models.GetObjectByName(name)
+	} else {
+		u.Respond(w, u.Message(false, "Error while parsing path parameters"))
+		u.ErrLog("Error while parsing path parameters", "GET ENTITY", "", r)
+		return
+	}
+
+	if data == nil {
+		resp = u.Message(false, "Error while getting "+name+": "+e1)
+		u.ErrLog("Error while getting "+name, "GET GENERIC", "", r)
+		w.WriteHeader(http.StatusNotFound)
+	} else {
+		resp = u.Message(true, "successfully got object")
+	}
+
+	if r.Method == "OPTIONS" && data != nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.Header().Add("Allow", "GET, DELETE, OPTIONS, PATCH, PUT")
+	} else {
+		resp["data"] = data
+		u.Respond(w, resp)
+	}
+
+}
+
 // swagger:operation GET /api/{objs}/{id} objects GetObject
 // Gets an Object from the system.
 // The ID must be provided in the URL parameter
