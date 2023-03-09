@@ -365,6 +365,9 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 	switch entity {
 	case u.SITE, u.BLDG, u.ROOM, u.RACK, u.DEVICE, u.AC,
 		u.PWRPNL, u.CABINET, u.CORRIDOR, u.SENSOR, u.GROUP:
+		if strings.ContainsAny(t["name"].(string), ".") {
+			return u.Message(false, "Character . is not allowed for names"), false
+		}
 		//Check if Parent ID is valid
 		//returns a map[string]interface{} to hold parent entity
 		//if parent found
@@ -530,6 +533,10 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 		//Check for parent if PID provided
 		//Need to check for uniqueness before inserting
 		//this is helpful for the validation endpoints
+		if strings.ContainsAny(t["name"].(string), ".") {
+			return u.Message(false, "Character . is not allowed for names"), false
+		}
+
 		ctx, cancel := u.Connect()
 		entStr := u.EntityToString(entity)
 
