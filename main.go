@@ -71,7 +71,7 @@ func main() {
 		controllers.Version).Methods("GET", "OPTIONS", "HEAD")
 
 	// For obtaining temperatureUnit from object's site
-	router.HandleFunc("/api/tempunits/{id:[a-zA-Z0-9]{24}}",
+	router.HandleFunc("/api/tempunits/{id}",
 		controllers.GetTempUnit).Methods("GET", "OPTIONS", "HEAD")
 
 	// For obtaining the complete hierarchy (tree)
