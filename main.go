@@ -52,7 +52,7 @@ var hnmatch mux.MatcherFunc = func(request *http.Request, match *mux.RouteMatch)
 		MatchString(request.URL.String())
 }
 
-func main() {
+func Router(jwt func(next http.Handler) http.Handler) *mux.Router {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/api",
@@ -156,13 +156,18 @@ func main() {
 
 	//Attach JWT auth middleware
 	//router.Use(app.Log)
-	router.Use(app.JwtAuthentication)
+	router.Use(jwt)
 
+	return router
+}
+
+func main() {
 	//TODO:
 	//Use the URL below to help make the router functions more
 	//flexible and thus implement the http OPTIONS method
 	//cleanly
 	//https://medium.com/@matryer/writing-middleware-in-golang-and-how-go-makes-it-so-much-fun-4375c1246e81
+	router := Router(app.JwtAuthentication)
 
 	//Get port from .env file, no port was specified
 	//So this should return an empty string when
