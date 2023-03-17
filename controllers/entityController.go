@@ -246,7 +246,7 @@ var CreateEntity = func(w http.ResponseWriter, r *http.Request) {
 //	    description: Not Found. An error message will be returned.
 var GetGenericObject = func(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("******************************************************")
-	fmt.Println("FUNCTION CALL: 	 GetEntity ")
+	fmt.Println("FUNCTION CALL: 	 GetGenericObject ")
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
 	var data map[string]interface{}
