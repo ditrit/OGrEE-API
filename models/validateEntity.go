@@ -26,7 +26,7 @@ func init() {
 
 func loadJsonSchemas(schemaPrefix string) {
 	var schemaPath = "schemas/"
-	dir := (schemaPath + schemaPrefix)[:len(schemaPath+schemaPrefix)-1] // without traling /
+	dir := strings.Trim(schemaPath+schemaPrefix, "/") // without trailing '/'
 	entries, err := embeddfs.ReadDir((dir))
 	if err != nil {
 		println(err.Error())
