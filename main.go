@@ -27,7 +27,7 @@ var dmatch mux.MatcherFunc = func(request *http.Request, match *mux.RouteMatch) 
 // Obtain object hierarchy
 var hmatch mux.MatcherFunc = func(request *http.Request, match *mux.RouteMatch) bool {
 	println("CHECKING H-MATCH")
-	return regexp.MustCompile(`(^(\/api\/(tenants|sites|buildings|rooms|rooms|racks|devices|stray-devices)\/[a-zA-Z0-9]{24}\/all)(\/(tenants|sites|buildings|rooms|rooms|racks|devices|stray-(devices|sensors)))*$)|(^(\/api\/(tenants|sites|buildings|rooms|rooms|racks|devices|stray-devices)\/[a-zA-Z0-9]{24}\/all)(\?limit=[0-9]+)*$)`).
+	return regexp.MustCompile(`(^(\/api\/(tenant|site|building|room|room|rack|device|stray-device)\/[a-zA-Z0-9]{24}\/all)(\/(tenants|sites|buildings|rooms|rooms|racks|devices|stray-(devices|sensors)))*$)|(^(\/api\/(tenants|sites|buildings|rooms|rooms|racks|devices|stray-devices)\/[a-zA-Z0-9]{24}\/all)(\?limit=[0-9]+)*$)`).
 		MatchString(request.URL.String())
 }
 
@@ -84,26 +84,26 @@ func Router(jwt func(next http.Handler) http.Handler) *mux.Router {
 
 	//GET ENTITY HIERARCHY
 	//This matches ranged Tenant Hierarchy
-	router.NewRoute().PathPrefix("/api/{entity}/{id:[a-zA-Z0-9]{24}}/all").
+	router.NewRoute().PathPrefix("/api/{entity}s/{id:[a-zA-Z0-9]{24}}/all").
 		MatcherFunc(hmatch).HandlerFunc(controllers.GetEntityHierarchy).Methods("GET", "HEAD", "OPTIONS")
 
-	router.NewRoute().PathPrefix("/api/{entity}/{name}/all").
+	router.NewRoute().PathPrefix("/api/{entity}s/{name}/all").
 		MatcherFunc(hnmatch).HandlerFunc(controllers.GetHierarchyByName).Methods("GET", "HEAD", "OPTIONS")
 
 	//GET EXCEPTIONS
-	router.HandleFunc("/api/{ancestor:tenants}/{tenant_name}/buildings",
+	router.HandleFunc("/api/{ancestor:tenant}s/{tenant_name}/buildings",
 		controllers.GetEntitiesOfAncestor).Methods("GET", "HEAD", "OPTIONS")
 
-	router.HandleFunc("/api/{ancestor:sites}/{id:[a-zA-Z0-9]{24}}/rooms",
+	router.HandleFunc("/api/{ancestor:site}s/{id:[a-zA-Z0-9]{24}}/rooms",
 		controllers.GetEntitiesOfAncestor).Methods("GET", "HEAD", "OPTIONS")
 
-	router.HandleFunc("/api/{ancestor:buildings}/{id:[a-zA-Z0-9]{24}}/{sub:acs|corridors|cabinets|panels|sensors|groups}",
+	router.HandleFunc("/api/{ancestor:building}s/{id:[a-zA-Z0-9]{24}}/{sub:ac|corridor|cabinet|panel|sensor|group}s",
 		controllers.GetEntitiesOfAncestor).Methods("GET", "HEAD", "OPTIONS")
 
-	router.HandleFunc("/api/{ancestor:buildings}/{id:[a-zA-Z0-9]{24}}/racks",
+	router.HandleFunc("/api/{ancestor:building}s/{id:[a-zA-Z0-9]{24}}/racks",
 		controllers.GetEntitiesOfAncestor).Methods("GET", "HEAD", "OPTIONS")
 
-	router.HandleFunc("/api/{ancestor:rooms}/{id:[a-zA-Z0-9]{24}}/devices",
+	router.HandleFunc("/api/{ancestor:room}s/{id:[a-zA-Z0-9]{24}}/devices",
 		controllers.GetEntitiesOfAncestor).Methods("GET", "HEAD", "OPTIONS")
 
 	// GET BY QUERY
@@ -111,48 +111,48 @@ func Router(jwt func(next http.Handler) http.Handler) *mux.Router {
 		HandlerFunc(controllers.GetEntityByQuery).Methods("HEAD", "GET")
 
 	//GET ENTITY
-	router.HandleFunc("/api/{entity}/{id:[a-zA-Z0-9]{24}}",
+	router.HandleFunc("/api/{entity}s/{id:[a-zA-Z0-9]{24}}",
 		controllers.GetEntity).Methods("GET", "HEAD", "OPTIONS")
 
-	router.HandleFunc("/api/{entity}/{name}",
+	router.HandleFunc("/api/{entity}s/{name}",
 		controllers.GetEntity).Methods("GET", "HEAD", "OPTIONS")
 
 	//GET BY NAME OF PARENT
-	router.NewRoute().PathPrefix("/api/{entity}/{tenant_name}").
+	router.NewRoute().PathPrefix("/api/{entity}s/{tenant_name}").
 		MatcherFunc(tmatch).HandlerFunc(controllers.GetEntitiesUsingNamesOfParents).Methods("GET", "HEAD", "OPTIONS")
 
-	router.NewRoute().PathPrefix("/api/{entity}/{id:[a-zA-Z0-9]{24}}").
+	router.NewRoute().PathPrefix("/api/{entity}s/{id:[a-zA-Z0-9]{24}}").
 		MatcherFunc(pmatch).HandlerFunc(controllers.GetEntitiesUsingNamesOfParents).Methods("GET", "HEAD", "OPTIONS")
 
 	// GET ALL ENTITY
 
-	router.HandleFunc("/api/{entity}",
+	router.HandleFunc("/api/{entity}s",
 		controllers.GetAllEntities).Methods("HEAD", "GET")
 
 	// CREATE ENTITY
-	router.HandleFunc("/api/{entity}",
+	router.HandleFunc("/api/{entity}s",
 		controllers.CreateEntity).Methods("POST")
 
 	//DELETE ENTITY
-	router.HandleFunc("/api/{entity}/{id:[a-zA-Z0-9]{24}}",
+	router.HandleFunc("/api/{entity}s/{id:[a-zA-Z0-9]{24}}",
 		controllers.DeleteEntity).Methods("DELETE")
 
-	router.HandleFunc("/api/{entity}/{name}",
+	router.HandleFunc("/api/{entity}s/{name}",
 		controllers.DeleteEntity).Methods("DELETE")
 
 	// UPDATE ENTITY
-	router.HandleFunc("/api/{entity}/{id:[a-zA-Z0-9]{24}}",
+	router.HandleFunc("/api/{entity}s/{id:[a-zA-Z0-9]{24}}",
 		controllers.UpdateEntity).Methods("PUT", "PATCH")
 
-	router.HandleFunc("/api/{entity}/{name}",
+	router.HandleFunc("/api/{entity}s/{name}",
 		controllers.UpdateEntity).Methods("PUT", "PATCH")
 
 	//OPTIONS BLOCK
-	router.HandleFunc("/api/{entity}",
+	router.HandleFunc("/api/{entity}s",
 		controllers.BaseOption).Methods("OPTIONS")
 
 	//VALIDATION
-	router.HandleFunc("/api/validate/{entity}", controllers.ValidateEntity).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/validate/{entity}s", controllers.ValidateEntity).Methods("POST", "OPTIONS")
 
 	//Attach JWT auth middleware
 	//router.Use(app.Log)

@@ -146,7 +146,6 @@ var CreateEntity = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entStr = entStr[:len(entStr)-1] // remove trailing 's'
 	entUpper := strings.ToUpper(entStr)
 
 	if err != nil {
@@ -355,7 +354,6 @@ var GetEntity = func(w http.ResponseWriter, r *http.Request) {
 
 	//Get entity type and strip trailing 'entityStr'
 	entityStr := mux.Vars(r)["entity"]
-	entityStr = entityStr[:len(entityStr)-1]
 
 	//If templates, format them
 	entityStr = strings.Replace(entityStr, "-", "_", 1)
@@ -474,7 +472,6 @@ var GetAllEntities = func(w http.ResponseWriter, r *http.Request) {
 
 	//Main hierarchy objects
 	entStr = mux.Vars(r)["entity"]
-	entStr = entStr[:len(entStr)-1]
 	println("ENTSTR: ", entStr)
 
 	//If templates, format them
@@ -561,9 +558,8 @@ var DeleteEntity = func(w http.ResponseWriter, r *http.Request) {
 	id, e := mux.Vars(r)["id"]
 	name, e2 := mux.Vars(r)["name"]
 
-	//Get entity from URL and strip trailing 's'
+	//Get entity from URL
 	entity := mux.Vars(r)["entity"]
-	entity = entity[:len(entity)-1]
 
 	//If templates, format them
 	entity = strings.Replace(entity, "-", "_", 1)
@@ -774,7 +770,6 @@ var UpdateEntity = func(w http.ResponseWriter, r *http.Request) {
 
 	//Get entity from URL and strip trailing 's'
 	entity = mux.Vars(r)["entity"]
-	entity = entity[:len(entity)-1]
 
 	//If templates, format them
 	entity = strings.Replace(entity, "-", "_", 1)
@@ -1083,9 +1078,7 @@ var GetEntitiesOfAncestor = func(w http.ResponseWriter, r *http.Request) {
 	var id string
 	var e bool
 	var resp map[string]interface{}
-	//Extract string between /api and /{id}
 	entStr := mux.Vars(r)["ancestor"]
-	entStr = entStr[:len(entStr)-1] // remove s
 	enum := u.EntityStrToInt(entStr)
 
 	//Prevents Mongo from creating a new unidentified collection
@@ -1108,14 +1101,8 @@ var GetEntitiesOfAncestor = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lastSlashIdx := strings.LastIndex(r.URL.Path, "/")
-	indicator := r.URL.Path[lastSlashIdx+1:]
-	switch indicator {
-	case "acs", "panels", "corridors", "cabinets", "sensors":
-		indicator = indicator[:len(indicator)-1]
-	default:
-		indicator = ""
-	}
+	//Could be: "ac", "panel", "corridor", "cabinet", "sensor"
+	indicator := mux.Vars(r)["sub"]
 
 	//TODO: hierarchyName
 	data, e1 := models.GetEntitiesOfAncestor(id, enum, entStr, indicator)
@@ -1409,7 +1396,6 @@ var GetHierarchyByName = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entity = entity[:len(entity)-1] // remove s
 	// If template or stray convert '-' -> '_'
 	entity = strings.Replace(entity, "-", "_", 1)
 
@@ -1541,9 +1527,7 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 	fmt.Println("FUNCTION CALL: 	 GetEntitiesUsingNamesOfParents ")
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
-	//Extract string between /api and /{id}
-	idx := strings.Index(r.URL.Path[5:], "/") + 4
-	entity := r.URL.Path[5:idx]
+	entity := mux.Vars(r)["entity"]
 	var resp map[string]interface{}
 
 	//If template or stray convert '-' -> '_'
@@ -1722,7 +1706,6 @@ var BaseOption = func(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
 	entity, e1 := mux.Vars(r)["entity"]
-	entity = entity[:len(entity)-1]
 	if !e1 || u.EntityStrToInt(entity) == -1 {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -1847,7 +1830,6 @@ var ValidateEntity = func(w http.ResponseWriter, r *http.Request) {
 	DispRequestMetaData(r)
 	var obj map[string]interface{}
 	entity, e1 := mux.Vars(r)["entity"]
-	entity = entity[:len(entity)-1]
 
 	//If templates or stray-devices, format them
 	if idx := strings.Index(entity, "-"); idx != -1 {
