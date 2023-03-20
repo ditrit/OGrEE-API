@@ -2,6 +2,7 @@ package models
 
 import (
 	"embed"
+	"fmt"
 	u "p3/utils"
 	"strings"
 
@@ -183,6 +184,7 @@ func validateJsonSchema(entity int, t map[string]interface{}) (map[string]interf
 	if err := sch.Validate(t); err != nil {
 		switch v := err.(type) {
 		case *jsonschema.ValidationError:
+			fmt.Println(t)
 			println(v.GoString())
 			resp := u.Message(false, "JSON body doesn't validate with the expected JSON schema")
 			// Format errors array

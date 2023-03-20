@@ -20,7 +20,7 @@
         },
         "name": {
           "type": "string",
-          "pattern":"^[a-zA-Z](\\w|\\-|_)*$"
+          "pattern":"^\\w(\\w|\\-)*$"
         },
         "id": {
           "type": "string"
