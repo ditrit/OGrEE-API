@@ -1233,7 +1233,7 @@ var GetEntityHierarchy = func(w http.ResponseWriter, r *http.Request) {
 	//Check if the request is a ranged hierarchy
 	filters := getFiltersFromQueryParams(r)
 	if len(filters.Limit) > 0 { //limit={number} was provided
-		end, _ = strconv.Atoi(filters.Limit[0])
+		end, _ = strconv.Atoi(filters.Limit)
 		limit = u.EntityStrToInt(entity) + end
 
 		if end == 0 {
@@ -1412,8 +1412,8 @@ var GetHierarchyByName = func(w http.ResponseWriter, r *http.Request) {
 	// Check if the request is a ranged hierarchy
 	filters := getFiltersFromQueryParams(r)
 	if len(filters.Limit) > 0 {
-		// limit={number} was provided
-		limit, _ = strconv.Atoi(filters.Limit[0])
+		//limit={number} was provided
+		limit, _ = strconv.Atoi(filters.Limit)
 	} else {
 		limit = 999
 	}

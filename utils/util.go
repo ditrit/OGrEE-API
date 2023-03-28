@@ -41,9 +41,9 @@ const (
 
 type RequestFilters struct {
 	FieldsToShow []string `schema:"fieldOnly"`
-	StartDate    []string `schema:"startDate"`
-	EndDate      []string `schema:"endDate"`
-	Limit        []string `schema:"limit"`
+	StartDate    string   `schema:"startDate"`
+	EndDate      string   `schema:"endDate"`
+	Limit        string   `schema:"limit"`
 }
 
 func GetBuildDate() string {

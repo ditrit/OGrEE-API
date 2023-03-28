@@ -126,7 +126,7 @@ func getDateFilters(req bson.M, filters u.RequestFilters) error {
 	if len(filters.StartDate) > 0 || len(filters.EndDate) > 0 {
 		lastUpdateReq := bson.M{}
 		if len(filters.StartDate) > 0 {
-			startDate, e := time.Parse("2006-01-02", filters.StartDate[0])
+			startDate, e := time.Parse("2006-01-02", filters.StartDate)
 			if e != nil {
 				return e
 			}
@@ -134,7 +134,7 @@ func getDateFilters(req bson.M, filters u.RequestFilters) error {
 		}
 
 		if len(filters.EndDate) > 0 {
-			endDate, e := time.Parse("2006-01-02", filters.EndDate[0])
+			endDate, e := time.Parse("2006-01-02", filters.EndDate)
 			endDate = endDate.Add(time.Hour * 24)
 			if e != nil {
 				return e
