@@ -1221,6 +1221,7 @@ var GetEntityHierarchy = func(w http.ResponseWriter, r *http.Request) {
 	var resp map[string]interface{}
 	var limit int
 	var end int
+	var entInt int
 	var data map[string]interface{}
 	var e1 string
 
@@ -1271,6 +1272,19 @@ var GetEntityHierarchy = func(w http.ResponseWriter, r *http.Request) {
 	} else {
 		//arbitrarily set value to 999
 		limit = 999
+
+		//Verify that the entire URL is valid
+		arr := (strings.Split(r.URL.Path, "/")[4:])
+		entInt = u.EntityStrToInt(entity)
+		for i, item := range arr {
+			eltInt := u.EntityStrToInt(item[:len(item)-1])
+			if (eltInt < 0 || eltInt <= entInt) && item != "all" {
+				w.WriteHeader(http.StatusBadRequest)
+				resp = u.Message(false, "Invalid object in URL: "+arr[i])
+				u.Respond(w, resp)
+				return
+			}
+		}
 	}
 
 	println("The limit is: ", limit)
@@ -1541,6 +1555,7 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
 	entity := mux.Vars(r)["entity"]
+	var entityInt int
 	var resp map[string]interface{}
 
 	//If template or stray convert '-' -> '_'
@@ -1555,7 +1570,8 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 	}
 
 	//Prevents Mongo from creating a new unidentified collection
-	if u.EntityStrToInt(entity) < 0 {
+	entityInt = u.EntityStrToInt(entity)
+	if entityInt < 0 {
 		w.WriteHeader(http.StatusNotFound)
 		u.Respond(w, u.Message(false, "Invalid object in URL:"+entity+" Please provide a valid object"))
 		u.ErrLog("Cannot get invalid object", "GET ENTITIESUSINGANCESTORNAMES "+entity, "", r)
@@ -1572,32 +1588,32 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 		//If templates, format them
 		key = strings.Replace(key, "-", "_", 1)
 
-		if i%2 == 0 { //The keys (entities) are at the even indexes
-			if i+1 >= len(arr) {
-				//Small front end hack since client wants stray-device URLs
-				//to be like: URL/stray-devices/ID/devices
-				if key == "device" && entity == "stray_device" {
-					key = "stray_device"
-				}
+		//Invalid object to retrieve was given
+		keyInt := u.EntityStrToInt(key)
 
+		//Only check even indices, since they have
+		//the object categories
+		if (keyInt < 0 || entityInt >= keyInt) && k != "all" && i%2 == 0 {
+			resp = u.Message(false, entity+"s do not have '"+k+"'")
+			resp["data"] = map[string]interface{}{}
+			u.ErrLog("Invalid objects in URL: "+k, "GET "+entity, "", r)
+			w.WriteHeader(http.StatusBadRequest)
+			u.Respond(w, resp)
+			return
+		}
+
+		if i%2 == 0 { //The keys (entities) are at the even indexes
+
+			//Small front end hack since client wants stray-device URLs
+			//to be like: URL/stray-devices/ID/devices
+			if key == "device" && entity == "stray_device" {
+				key = "stray_device"
+			}
+
+			if i+1 >= len(arr) {
 				ancestry = append(ancestry,
 					map[string]string{key: "all"})
 			} else {
-
-				//Prevents Mongo from creating a new unidentified collection
-				if u.EntityStrToInt(key) < 0 {
-					w.WriteHeader(http.StatusNotFound)
-					u.Respond(w, u.Message(false, "Invalid object in URL:"+key+" Please provide a valid object"))
-					u.ErrLog("Cannot get invalid object", "GET "+key, "", r)
-					return
-				}
-
-				//Small front end hack since client wants stray-device URLs
-				//to be like: URL/stray-devices/ID/devices/ID/devices
-				if key == "device" && entity == "stray_device" {
-					key = "stray_device"
-				}
-
 				ancestry = append(ancestry,
 					map[string]string{key: arr[i+1]})
 			}
