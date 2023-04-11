@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	u "p3/utils"
+	"strconv"
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
@@ -396,6 +397,25 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 
 						}
 
+					case u.DEVICE:
+						v := t["attributes"].(map[string]interface{})
+						if HasMapStringKey(v, "slot") {
+							if r, status := CheckRackSlotIsFree(v["slot"],
+								v["parentId"].(string)); !status {
+								return r, status
+							}
+
+						} else {
+							//Get Floats from sizeU and height U START
+							height := GetFloatFromStrOrInf(v["heightU"])
+							size := GetFloatFromStrOrInf(v["sizeU"])
+
+							if r, status := RackSpaceChecker(height,
+								size, t["parentId"].(string)); !status {
+								return r, status
+							}
+						}
+
 					case u.CORRIDOR:
 						//Ensure the 2 racks are valid
 						racks := strings.Split(v["content"].(string), ",")
@@ -541,7 +561,139 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 	return u.Message(true, "success"), true
 }
 
+// This will check if a device can be inserted in a rack at a certain 'U'
+// No consideration for devices other than 'U' units at this time
+func RackSpaceChecker(wantedHeight, wantedSize float64, pid string) (map[string]interface{}, bool) {
+	req := bson.M{"parentId": pid}
+	var rackHeight int
+	var rackHeightStr string
+
+	//Get the Rack block
+	parentID, _ := primitive.ObjectIDFromHex(pid)
+	rack, err1 := GetEntity(bson.M{"_id": parentID}, "rack", u.RequestFilters{})
+	if err1 != "" || rack == nil {
+		//The device already had a valid parent, so this
+		//case can only mean that it is a subdevice
+		return nil, true
+
+	}
+
+	//Get the rack height and ensure that the device is within
+	//the rack height range
+	if v, ok := rack["attributes"].(map[string]interface{})["height"]; !ok {
+		println("Error: A device in the server does not meet requirements")
+		return u.Message(false, "Internal error"), false
+	} else {
+		rackHeightStr = v.(string)
+		rackHeight, _ = strconv.Atoi(v.(string))
+	}
+
+	if rackHeight < int(wantedHeight) {
+		msg := "Error: The device cannot be placed in the rack" +
+			" because the desired height exceeds the rack height." +
+			"Rack height: " + rackHeightStr
+		return u.Message(false, msg), false
+	}
+
+	//Get the Devices of the Rack
+	devs, err := GetManyEntities("device", req, u.RequestFilters{})
+	if devs == nil {
+		println("DEBUG err:", err)
+		return u.Message(false, "Internal Error"), false
+	}
+
+	for _, v := range devs {
+		var loc, size float64
+		var lInf, sInf interface{}
+
+		//Ensure every device is comparable
+		//we have to check that the attributes have valid sizeU and heightU
+		//TODO: Consider validating every device here before proceeding
+
+		//Get the device size and height (loc)
+		lInf = v["attributes"].(map[string]interface{})["heightU"]
+		sInf = v["attributes"].(map[string]interface{})["sizeU"]
+		loc = GetFloatFromStrOrInf(lInf)
+		size = GetFloatFromStrOrInf(sInf)
+
+		//Check if insert location is within a device
+		//Check if the device crosses into another device
+		//If so, draw the rack in text and reject the request
+		if !((wantedHeight < loc && wantedHeight+wantedSize < loc) ||
+			(wantedHeight > (size+loc) && wantedHeight+wantedSize > (size+loc))) {
+
+			objSize := strconv.Itoa((int(size)))
+			objHeight := strconv.Itoa((int(loc)))
+			println("WANTED LOC:", wantedHeight, "SIZE:", wantedSize)
+			println("CURR   LOC:", loc, "SIZE:", size)
+
+			//Draw the current rack setup START
+			msg := "Error there is another device taking this space! Name: " +
+				v["name"].(string) + " HeightU: " +
+				objHeight + " SizeU: " + objSize
+
+			//Draw the current rack setup END
+			resp := u.Message(false, msg)
+			resp["rackArrangement"] = devs
+			return resp, false
+
+		}
+	}
+
+	return nil, true
+}
+
 // Auxillary Functions
+// Auxillary function
+func GetFloatFromStrOrInf(x interface{}) float64 {
+	if IsFloat(x) {
+		return x.(float64)
+	}
+	if IsInt(x) {
+		return float64(x.(int))
+
+	} else if IsString(x) { //Can only be string
+		return StrToFloat(x.(string))
+	}
+	//Error case
+	return -1
+}
+
+// If a user specified a slot for device creation this
+// will check if the slot is free
+func CheckRackSlotIsFree(value interface{}, pid string) (map[string]interface{}, bool) {
+	req := bson.M{"parentId": pid}
+	devs, err := GetManyEntities("device", req, u.RequestFilters{})
+	if devs == nil {
+		println("DEBUG err:", err)
+		return nil, false
+	}
+	for i := range devs {
+		if devs[i]["attributes"].(map[string]interface{})["slot"] == value {
+			return u.Message(false,
+				"Error this slot is already taken by another device:"+devs[i]["name"].(string)), false
+		}
+	}
+	return nil, true
+}
+
+// Auxillary function converts string -> float64
+// Returns 0 on error
+func StrToFloat(x string) float64 {
+	value, e := strconv.ParseFloat(x, 64)
+	if e != nil {
+		return 0
+	}
+	return value
+}
+
+func HasMapStringKey(x map[string]interface{}, key string) bool {
+	if x[key] == nil || x[key] == "" {
+		return false
+	}
+	return true
+}
+
 func EnsureUnique(x []string) (string, bool) {
 	dict := map[string]int{}
 	for _, item := range x {
@@ -551,4 +703,21 @@ func EnsureUnique(x []string) (string, bool) {
 		}
 	}
 	return "", true
+}
+
+func IsFloat(x interface{}) bool {
+	_, ok1 := x.(float32)
+	_, ok2 := x.(float64)
+
+	return ok1 || ok2
+}
+
+func IsString(x interface{}) bool {
+	_, ok := x.(string)
+	return ok
+}
+
+func IsInt(x interface{}) bool {
+	_, ok := x.(int)
+	return ok
 }
