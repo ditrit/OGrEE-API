@@ -1,10 +1,39 @@
-//localhost = 127.0.0.1
-//
-var m = new Mongo()
-var db = m.getDB("ogree")
+/////
+// Create a new Database
+// Only invoked by an administrative process, when a new customer
+// subscribes
+//////
 
+//
+// CONSTANT DECLARATIONS
+//
+DB_NAME;
+CUSTOMER_RECORDS_DB;
+ADMIN_USER;
+ADMIN_PASS;
+
+
+//Check if host was passed as argument
+//Otherwise use localhost
+try {
+  host;
+} catch(e) {
+  host = "localhost:27017"
+}
+
+//Authenticate first
+var m = new Mongo(host)
+var authDB = m.getDB("test")
+authDB.auth(ADMIN_USER,ADMIN_PASS);
+
+
+//Update customer record table
+var odb = m.getDB(CUSTOMER_RECORDS_DB)
+odb.customer.insertOne({"name": DB_NAME});
+
+var db = m.getDB("ogree"+DB_NAME)
 db.createCollection('account');
-db.createCollection('tenant');
+db.createCollection('domain');
 db.createCollection('site');
 db.createCollection('building');
 db.createCollection('room');
@@ -19,7 +48,6 @@ db.createCollection('bldg_template');
 //Group Collections
 db.createCollection('group');
 
-
 //Nonhierarchal objects
 db.createCollection('ac');
 db.createCollection('panel');
@@ -31,24 +59,21 @@ db.createCollection('sensor');
 db.createCollection('stray_device');
 db.createCollection('stray_sensor');
 
-
-//Enforce unique Tenant Names
-db.tenant.createIndex( {"name":1}, { unique: true } );
+//Enfore unique Tenant Names
+db.domain.createIndex( {parentId:1, name:1}, { unique: true } );
 
 //Enforce unique children
-db.site.createIndex({parentId:1, name:1}, { unique: true });
+db.site.createIndex({name:1}, { unique: true });
 db.building.createIndex({parentId:1, name:1}, { unique: true });
 db.room.createIndex({parentId:1, name:1}, { unique: true });
 db.rack.createIndex({parentId:1, name:1}, { unique: true });
 db.device.createIndex({parentId:1, name:1}, { unique: true });
 //Enforcing that the Parent Exists is done at the ORM Level for now
 
-
 //Make slugs unique identifiers for templates
 db.room_template.createIndex({slug:1}, { unique: true });
 db.obj_template.createIndex({slug:1}, { unique: true });
 db.bldg_template.createIndex({slug:1}, { unique: true });
-
 
 //Unique children restriction for nonhierarchal objects and sensors
 db.ac.createIndex({parentId:1, name:1}, { unique: true });

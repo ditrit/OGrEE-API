@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -23,72 +24,6 @@ func getObjID(x string) (primitive.ObjectID, error) {
 		return objID, err
 	}
 	return objID, nil
-}
-
-func parseDataForNonStdResult(ent string, eNum int, data map[string]interface{}) map[string][]map[string]interface{} {
-
-	ans := map[string][]map[string]interface{}{}
-	add := []map[string]interface{}{}
-
-	firstIndex := u.EntityToString(eNum + 1)
-	firstArr := data[firstIndex+"s"].([]map[string]interface{})
-
-	ans[firstIndex+"s"] = firstArr
-
-	for i := range firstArr {
-		nxt := u.EntityToString(eNum + 2)
-		add = append(add, firstArr[i][nxt+"s"].([]map[string]interface{})...)
-	}
-
-	ans[u.EntityToString(eNum+2)+"s"] = add
-	newAdd := []map[string]interface{}{}
-	for i := range add {
-		nxt := u.EntityToString(eNum + 3)
-		newAdd = append(newAdd, add[i][nxt+"s"].([]map[string]interface{})...)
-	}
-
-	ans[u.EntityToString(eNum+3)+"s"] = newAdd
-
-	newAdd2 := []map[string]interface{}{}
-	for i := range newAdd {
-		nxt := u.EntityToString(eNum + 4)
-		newAdd2 = append(newAdd2, newAdd[i][nxt+"s"].([]map[string]interface{})...)
-	}
-
-	ans[u.EntityToString(eNum+4)+"s"] = newAdd2
-	newAdd3 := []map[string]interface{}{}
-
-	for i := range newAdd2 {
-		nxt := u.EntityToString(eNum + 5)
-		newAdd3 = append(newAdd3, newAdd2[i][nxt+"s"].([]map[string]interface{})...)
-	}
-	ans[u.EntityToString(eNum+5)+"s"] = newAdd3
-
-	newAdd4 := []map[string]interface{}{}
-
-	for i := range newAdd3 {
-		nxt := u.EntityToString(eNum + 6)
-		newAdd4 = append(newAdd4, newAdd3[i][nxt+"s"].([]map[string]interface{})...)
-	}
-
-	ans[u.EntityToString(eNum+6)+"s"] = newAdd4
-
-	newAdd5 := []map[string]interface{}{}
-
-	for i := range newAdd4 {
-		nxt := u.EntityToString(eNum + 7)
-		newAdd5 = append(newAdd5, newAdd4[i][nxt+"s"].([]map[string]interface{})...)
-	}
-
-	ans[u.EntityToString(eNum+7)+"s"] = newAdd5
-
-	//add := []map[string]interface{}{}
-
-	//Get All first entities
-	/*for i := eNum + 1; i < SUBDEV1; i++ {
-		add = append(add, firstArr[i])
-	}*/
-	return ans
 }
 
 // This function is useful for debugging
@@ -135,6 +70,14 @@ func DispRequestMetaData(r *http.Request) {
 	fmt.Println(time.Now().Format("2006-Jan-02 Monday 03:04:05 PM MST -07:00"))
 }
 
+var decoder = schema.NewDecoder()
+
+func getFiltersFromQueryParams(r *http.Request) u.RequestFilters {
+	var filters u.RequestFilters
+	decoder.Decode(&filters, r.URL.Query())
+	return filters
+}
+
 // swagger:operation POST /api/{obj} objects CreateObject
 // Creates an object in the system.
 // ---
@@ -143,7 +86,7 @@ func DispRequestMetaData(r *http.Request) {
 // parameters:
 // - name: objs
 //   in: query
-//   description: 'Indicates the Object. Only values of "tenants", "sites",
+//   description: 'Indicates the Object. Only values of "sites","domains",
 //   "buildings", "rooms", "racks", "devices", "acs", "panels",
 //   "cabinets", "groups", "corridors",
 //   "room-templates", "obj-templates", "bldg-templates","sensors", "stray-devices",
@@ -170,7 +113,7 @@ func DispRequestMetaData(r *http.Request) {
 //   default: 999
 // - name: ParentID
 //   description: 'All objects are linked to a
-//   parent with the exception of Tenant since it has no parent'
+//   parent with the exception of Site since it has no parent'
 //   required: true
 //   type: int
 //   default: 999
@@ -199,21 +142,20 @@ var CreateEntity = func(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("FUNCTION CALL: 	 CreateEntity ")
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
+
 	var e string
 	var resp map[string]interface{}
 	entity := map[string]interface{}{}
 	err := json.NewDecoder(r.Body).Decode(&entity)
 
-	//strip the '/api' in URL
 	entStr, e1 := mux.Vars(r)["entity"]
-	if e1 == false {
+	if !e1 {
 		w.WriteHeader(http.StatusBadRequest)
 		u.Respond(w, u.Message(false, "Error while parsing path params"))
 		u.ErrLog("Error while parsing path params", "CREATE "+entStr, "", r)
 		return
 	}
 
-	entStr = entStr[:len(entStr)-1] // and the trailing 's'
 	entUpper := strings.ToUpper(entStr)
 
 	if err != nil {
@@ -224,12 +166,9 @@ var CreateEntity = func(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//If creating templates, format them
-	if idx := strings.Index(entStr, "-"); idx != -1 {
-		//entStr[idx] = '_'
-		entStr = entStr[:idx] + "_" + entStr[idx+1:]
-	}
-	i := u.EntityStrToInt(entStr)
+	entStr = strings.Replace(entStr, "-", "_", 1)
 
+	i := u.EntityStrToInt(entStr)
 	println("ENT: ", entStr)
 	println("ENUM VAL: ", i)
 
@@ -241,17 +180,18 @@ var CreateEntity = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//Hard Code the 'category'
-	//for all objects that are
-	//not obj_template
-	if i != u.OBJTMPL {
-		entity["category"] = entStr
+	//Check if category and endpoint match, except for templates and strays
+	if i < u.ROOMTMPL {
+		if entity["category"] != entStr {
+			w.WriteHeader(http.StatusBadRequest)
+			u.Respond(w, u.Message(false, "Category in request body does not correspond with desired object in endpoint"))
+			u.ErrLog("Cannot create invalid object", "CREATE "+mux.Vars(r)["entity"], "", r)
+			return
+		}
 	}
 
 	//Clean the data of 'id' attribute if present
-	if _, ok := entity["id"]; ok {
-		delete(entity, "id")
-	}
+	delete(entity, "id")
 
 	resp, e = models.CreateEntity(i, entity)
 
@@ -275,17 +215,93 @@ var CreateEntity = func(w http.ResponseWriter, r *http.Request) {
 	u.Respond(w, resp)
 }
 
+// swagger:operation GET /api/objects/{name} objects GetObject
+// Gets an Object from the system.
+// The hierarchyName must be provided in the URL parameter
+// ---
+// produces:
+// - application/json
+// parameters:
+//   - name: name
+//     in: query
+//     description: 'hierarchyName of the object'
+//
+// responses:
+//
+//	'200':
+//	    description: 'Found. A response body will be returned with
+//         a meaningful message.'
+//	'404':
+//	    description: Not Found. An error message will be returned.
+
+// swagger:operation OPTIONS /api/objects/{name} objects ObjectOptions
+// Displays possible operations for the resource in response header.
+// ---
+// produces:
+// - application/json
+// parameters:
+//   - name: name
+//     in: query
+//     description: 'hierarchyName of the object'
+//
+// responses:
+//
+//	'200':
+//	    description: 'Found. A response header will be returned with
+//	    possible operations.'
+//	'400':
+//	    description: Bad request. An error message will be returned.
+//	'404':
+//	    description: Not Found. An error message will be returned.
+var GetGenericObject = func(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("******************************************************")
+	fmt.Println("FUNCTION CALL: 	 GetGenericObject ")
+	fmt.Println("******************************************************")
+	DispRequestMetaData(r)
+	var data map[string]interface{}
+	var e1 string
+
+	var resp map[string]interface{}
+
+	name, e := mux.Vars(r)["name"]
+	filters := getFiltersFromQueryParams(r)
+	if e {
+		data, e1 = models.GetObjectByName(name, filters)
+	} else {
+		u.Respond(w, u.Message(false, "Error while parsing path parameters"))
+		u.ErrLog("Error while parsing path parameters", "GET ENTITY", "", r)
+		return
+	}
+
+	if data == nil {
+		resp = u.Message(false, "Error while getting "+name+": "+e1)
+		u.ErrLog("Error while getting "+name, "GET GENERIC", "", r)
+		w.WriteHeader(http.StatusNotFound)
+	} else {
+		resp = u.Message(true, "successfully got object")
+	}
+
+	if r.Method == "OPTIONS" && data != nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.Header().Add("Allow", "GET, DELETE, OPTIONS, PATCH, PUT")
+	} else {
+		resp["data"] = data
+		u.Respond(w, resp)
+	}
+
+}
+
 // swagger:operation GET /api/{objs}/{id} objects GetObject
 // Gets an Object from the system.
 // The ID must be provided in the URL parameter
-// The name can be used instead of ID if the obj is tenant
+// The name can be used instead of ID if the obj is site
 // ---
 // produces:
 // - application/json
 // parameters:
 // - name: objs
 //   in: query
-//   description: 'Indicates the location. Only values of "tenants", "sites",
+//   description: 'Indicates the location. Only values of "sites","domains",
 //   "buildings", "rooms", "racks", "devices", "room-templates",
 //   "obj-templates", "bldg-templates","acs", "panels","cabinets", "groups",
 //   "corridors","sensors","stray-devices", "stray-sensors" are acceptable'
@@ -294,7 +310,7 @@ var CreateEntity = func(w http.ResponseWriter, r *http.Request) {
 //   default: "sites"
 // - name: ID
 //   in: path
-//   description: 'ID of desired object or Name of Tenant.
+//   description: 'ID of desired object or Name of Site.
 //   For templates the slug is the ID. For stray-devices the name is the ID'
 //   required: true
 //   type: int
@@ -316,13 +332,13 @@ var CreateEntity = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 //   - name: objs
 //     in: query
-//     description: 'Only values of "tenants", "sites",
+//     description: 'Only values of "sites","domains",
 //     "buildings", "rooms", "racks", "devices", "room-templates",
-//     "obj-templates", "bldg-templates","acs", "panels","cabinets", "groups",
+//     "obj-templates","bldg-templates", "acs", "panels","cabinets", "groups",
 //     "corridors","sensors","stray-devices","stray-sensors", are acceptable'
 //   - name: id
 //     in: query
-//     description: 'ID of the object or name of Tenant.
+//     description: 'ID of the object or name of Site.
 //     For templates the slug is the ID. For stray-devices the name is the ID'
 //
 // responses:
@@ -339,26 +355,24 @@ var GetEntity = func(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("FUNCTION CALL: 	 GetEntity ")
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
+
 	var data map[string]interface{}
 	var id, e1 string
 	var x primitive.ObjectID
 	var e bool
 	var e2 error
 
-	resp := u.Message(true, "success")
+	var resp map[string]interface{}
 
-	//Get entity type and strip trailing 's'
-	s, _ := mux.Vars(r)["entity"]
-	s = s[:len(s)-1]
+	//Get entity type
+	entityStr := mux.Vars(r)["entity"]
+	filters := getFiltersFromQueryParams(r)
 
 	//If templates, format them
-	if idx := strings.Index(s, "-"); idx != -1 {
-		s = s[:idx] + "_" + s[idx+1:]
-	}
+	entityStr = strings.Replace(entityStr, "-", "_", 1)
 
 	//GET By ID
-	if id, e = mux.Vars(r)["id"]; e == true {
-
+	if id, e = mux.Vars(r)["id"]; e {
 		x, e2 = getObjID(id)
 		if e2 != nil {
 			u.Respond(w, u.Message(false, "Error while converting ID to ObjectID"))
@@ -367,52 +381,42 @@ var GetEntity = func(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//Prevents API from creating a new unidentified collection
-		if i := u.EntityStrToInt(s); i < 0 {
+		if i := u.EntityStrToInt(entityStr); i < 0 {
 			w.WriteHeader(http.StatusNotFound)
 			u.Respond(w, u.Message(false, "Invalid object in URL: '"+mux.Vars(r)["entity"]+"' Please provide a valid object"))
 			u.ErrLog("Cannot get invalid object", "GET "+mux.Vars(r)["entity"], "", r)
 			return
 		}
 
-		data, e1 = models.GetEntity(bson.M{"_id": x}, s)
+		data, e1 = models.GetEntity(bson.M{"_id": x}, entityStr, filters)
 
-	} else if id, e = mux.Vars(r)["name"]; e == true { //GET By String
-
-		if idx := strings.Contains(s, "_"); idx == true &&
-			s != "stray_device" && s != "stray_sensor" { //GET By Slug
-			data, e1 = models.GetEntity(bson.M{"slug": id}, s)
-
-		} else if s == "stray_device" || s == "stray_sensor" || s == "tenant" {
-			data, e1 = models.GetEntity(bson.M{"name": id}, s) //GET By Name
-
+	} else if id, e = mux.Vars(r)["name"]; e { //GET By String
+		if entityStr == "site" || entityStr == "domain" || entityStr == "stray_device" {
+			data, e1 = models.GetEntity(bson.M{"name": id}, entityStr, filters) //GET By Name
+		} else if strings.Contains(entityStr, "template") {
+			data, e1 = models.GetEntity(bson.M{"slug": id}, entityStr, filters) //GET By Slug (template)
 		} else {
-			//Invalid entity and ID/name/slug combination
-			msg := "Bad path parameter received. Names and Slugs are available for tenants, templates and stray objects only. Otherwise please provide a valid ID"
-			resp = u.Message(false, msg)
-			w.WriteHeader(http.StatusBadRequest)
-			resp["data"] = nil
-			u.Respond(w, resp)
-			return
-
+			println(id)
+			data, e1 = models.GetEntity(bson.M{"hierarchyName": id}, entityStr, filters) // GET By hierarchyName
 		}
 	}
 
-	if e == false {
+	if !e {
 		u.Respond(w, u.Message(false, "Error while parsing path parameters"))
 		u.ErrLog("Error while parsing path parameters", "GET ENTITY", "", r)
 		return
 	}
 
 	if data == nil {
-		resp = u.Message(false, "Error while getting "+s+": "+e1)
-		u.ErrLog("Error while getting "+s, "GET "+strings.ToUpper(s), "", r)
+		resp = u.Message(false, "Error while getting "+entityStr+": "+e1)
+		u.ErrLog("Error while getting "+entityStr, "GET "+strings.ToUpper(entityStr), "", r)
 
 		switch e1 {
 		case "record not found":
 			w.WriteHeader(http.StatusNotFound)
 
 		case "mongo: no documents in result":
-			resp = u.Message(false, "Error while getting :"+s+", No Objects Found!")
+			resp = u.Message(false, "Error while getting :"+entityStr+", No Objects Found!")
 			w.WriteHeader(http.StatusNotFound)
 
 		case "invalid request":
@@ -424,11 +428,13 @@ var GetEntity = func(w http.ResponseWriter, r *http.Request) {
 	} else {
 
 		message := ""
-		switch u.EntityStrToInt(s) {
+		switch u.EntityStrToInt(entityStr) {
 		case u.ROOMTMPL:
 			message = "successfully got room_template"
 		case u.OBJTMPL:
 			message = "successfully got obj_template"
+		case u.BLDGTMPL:
+			message = "successfully got building_template"
 		default:
 			message = "successfully got object"
 		}
@@ -454,9 +460,9 @@ var GetEntity = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 //   - name: objs
 //     in: query
-//     description: 'Indicates the location. Only values of "tenants", "sites",
+//     description: 'Indicates the location. Only values of "sites","domains",
 //     "buildings", "rooms", "racks", "devices", "room-templates",
-//     "obj-templates","acs", "panels", "cabinets", "groups",
+//     "obj-templates","bldg-templates","acs", "panels", "cabinets", "groups",
 //     "corridors", "sensors", "stray-devices", "stray-sensors" are acceptable'
 //     required: true
 //     type: string
@@ -478,16 +484,11 @@ var GetAllEntities = func(w http.ResponseWriter, r *http.Request) {
 	var e, entStr string
 
 	//Main hierarchy objects
-
-	//entStr = arr[2][:len(arr[2])-1]
-	entStr, _ = mux.Vars(r)["entity"]
-	entStr = entStr[:len(entStr)-1]
+	entStr = mux.Vars(r)["entity"]
 	println("ENTSTR: ", entStr)
 
 	//If templates, format them
-	if idx := strings.Index(entStr, "-"); idx != -1 {
-		entStr = entStr[:idx] + "_" + entStr[idx+1:]
-	}
+	entStr = strings.Replace(entStr, "-", "_", 1)
 
 	//Prevents Mongo from creating a new unidentified collection
 	if i := u.EntityStrToInt(entStr); i < 0 {
@@ -497,14 +498,12 @@ var GetAllEntities = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, e = models.GetManyEntities(entStr, bson.M{}, nil)
+	data, e = models.GetManyEntities(entStr, bson.M{}, u.RequestFilters{})
 
-	entUpper := strings.ToUpper(entStr) // and the trailing 's'
-	resp := u.Message(true, "success")
-
+	var resp map[string]interface{}
 	if len(data) == 0 {
 		resp = u.Message(false, "Error while getting "+entStr+": "+e)
-		u.ErrLog("Error while getting "+entStr+"s", "GET ALL "+entUpper, e, r)
+		u.ErrLog("Error while getting "+entStr+"s", "GET ALL "+strings.ToUpper(entStr), e, r)
 
 		switch e {
 		case "":
@@ -540,9 +539,9 @@ var GetAllEntities = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 //   - name: objs
 //     in: query
-//     description: 'Indicates the location. Only values of "tenants", "sites",
+//     description: 'Indicates the location. Only values of "sites","domains",
 //     "buildings", "rooms", "racks", "devices", "room-templates",
-//     "obj-templates","acs", "panels",
+//     "obj-templates","bldg-templates","acs", "panels",
 //     "cabinets", "groups", "corridors","sensors", "stray-devices"
 //     "stray-sensors" are acceptable'
 //     required: true
@@ -550,7 +549,7 @@ var GetAllEntities = func(w http.ResponseWriter, r *http.Request) {
 //     default: "sites"
 //   - name: ID
 //     in: path
-//     description: 'ID of the object or name of Tenant.
+//     description: 'ID of the object or name of Site.
 //     For templates the slug is the ID. For stray-devices the name is the ID'
 //     required: true
 //     type: int
@@ -568,18 +567,16 @@ var DeleteEntity = func(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("FUNCTION CALL: 	 DeleteEntity ")
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
+
 	var v map[string]interface{}
 	id, e := mux.Vars(r)["id"]
 	name, e2 := mux.Vars(r)["name"]
 
-	//Get entity from URL and strip trailing 's'
-	entity, _ := mux.Vars(r)["entity"]
-	entity = entity[:len(entity)-1]
+	//Get entity from URL
+	entity := mux.Vars(r)["entity"]
 
 	//If templates, format them
-	if idx := strings.Index(entity, "-"); idx != -1 {
-		entity = entity[:idx] + "_" + entity[idx+1:]
-	}
+	entity = strings.Replace(entity, "-", "_", 1)
 
 	//Prevents Mongo from creating a new unidentified collection
 	if u.EntityStrToInt(entity) < 0 {
@@ -590,26 +587,16 @@ var DeleteEntity = func(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch {
-	case e2 == true && e == false: // DELETE SLUG or stray-device name
-		if entity == "stray_device" || entity == "stray_sensor" {
-			sd, _ := models.GetEntity(bson.M{"name": name}, entity)
-			if sd == nil {
-				w.WriteHeader(http.StatusNotFound)
-				u.Respond(w, u.Message(false, "Error object not found"))
-				return
-			}
-			if _, ok := sd["id"].(primitive.ObjectID); !ok {
-				w.WriteHeader(http.StatusInternalServerError)
-				u.Respond(w, u.Message(false,
-					"Server was not able to process your request"))
-				return
-			}
-			v, _ = models.DeleteEntity(entity, sd["id"].(primitive.ObjectID))
-		} else {
+	case e2 && !e: // DELETE by name
+		if strings.Contains(entity, "template") {
 			v, _ = models.DeleteEntityManual(entity, bson.M{"slug": name})
+		} else {
+			//use hierarchyName
+			v = models.DeleteEntityByName(entity, name)
+
 		}
 
-	case e == true && e2 == false: // DELETE NORMAL
+	case e && !e2: // DELETE by id
 		objID, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
 			u.Respond(w, u.Message(false, "Error while converting ID to ObjectID"))
@@ -653,7 +640,7 @@ var DeleteEntity = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 // - name: objs
 //   in: query
-//   description: 'Indicates the location. Only values of "tenants", "sites",
+//   description: 'Indicates the location. Only values of "sites","domains",
 //   "buildings", "rooms", "racks", "devices", "room-templates",
 //   "obj-templates", "bldg-templates","rooms", "acs", "panels", "cabinets", "groups",
 //   "corridors", "sensors", "stray-devices", "stray-sensors" are acceptable'
@@ -662,7 +649,7 @@ var DeleteEntity = func(w http.ResponseWriter, r *http.Request) {
 //   default: "sites"
 // - name: ID
 //   in: path
-//   description: 'ID of the object or name of Tenant.
+//   description: 'ID of the object or name of Site.
 //   For templates the slug is the ID. For stray-devices the name is the ID'
 //   required: true
 //   type: int
@@ -718,7 +705,7 @@ var DeleteEntity = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 // - name: objs
 //   in: query
-//   description: 'Indicates the location. Only values of "tenants", "sites",
+//   description: 'Indicates the location. Only values of "sites", "domains",
 //   "buildings", "rooms", "racks", "devices", "room-templates",
 //   "obj-templates", "bldg-templates","rooms","acs", "panels", "cabinets", "groups",
 //   "corridors","sensors", "stray-devices", "stray-sensors" are acceptable'
@@ -727,7 +714,7 @@ var DeleteEntity = func(w http.ResponseWriter, r *http.Request) {
 //   default: "sites"
 // - name: ID
 //   in: path
-//   description: 'ID of the object or name of Tenant.
+//   description: 'ID of the object or name of Site.
 //   For templates the slug is the ID. For stray-devices the name is the ID'
 //   required: true
 //   type: int
@@ -787,8 +774,6 @@ var UpdateEntity = func(w http.ResponseWriter, r *http.Request) {
 	}
 	println(r.Method)
 
-	//viewJson(r)
-
 	err := json.NewDecoder(r.Body).Decode(&updateData)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -798,13 +783,10 @@ var UpdateEntity = func(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Get entity from URL and strip trailing 's'
-	entity, _ = mux.Vars(r)["entity"]
-	entity = entity[:len(entity)-1]
+	entity = mux.Vars(r)["entity"]
 
 	//If templates, format them
-	if idx := strings.Index(entity, "-"); idx != -1 {
-		entity = entity[:idx] + "_" + entity[idx+1:]
-	}
+	entity = strings.Replace(entity, "-", "_", 1)
 
 	//Prevents Mongo from creating a new unidentified collection
 	if u.EntityStrToInt(entity) < 0 {
@@ -823,18 +805,19 @@ var UpdateEntity = func(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch {
-	case e2 == true: // UPDATE SLUG
+	case e2: // Update with slug/hierarchyName
 		var req bson.M
-		if entity == "stray_device" || entity == "stray_sensor" {
+		if strings.Contains(entity, "template") {
+			req = bson.M{"slug": name}
+		} else if entity == "site" {
 			req = bson.M{"name": name}
 		} else {
-			req = bson.M{"slug": name}
+			req = bson.M{"hierarchyName": name}
 		}
 
 		v, e3 = models.UpdateEntity(entity, req, &updateData, isPatch)
 
-	case e == true: // UPDATE NORMAL
-		println("updating Normale")
+	case e: // Update with id
 		objID, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -882,27 +865,27 @@ var UpdateEntity = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 //   - name: objs
 //     in: query
-//     description: 'Indicates the object. Only values of "tenants", "sites",
+//     description: 'Indicates the object. Only values of "domains", "sites",
 //     "buildings", "rooms", "racks", "devices", "room-templates",
-//     "obj-templates","acs","panels", "groups", "corridors",
+//     "obj-templates","bldg-templates","acs","panels", "groups", "corridors",
 //     "sensors", "stray-devices" and "stray-sensors" are acceptable'
 //     required: true
 //     type: string
 //     default: "sites"
 //   - name: Name
 //     in: query
-//     description: Name of tenant
+//     description: Name of Site
 //     required: false
 //     type: string
 //     default: "INFINITI"
 //   - name: Category
 //     in: query
-//     description: Category of Tenant (ex. Consumer Electronics, Medical)
+//     description: Category of Site (ex. Consumer Electronics, Medical)
 //     required: false
 //     type: string
 //     default: "Auto"
 //   - name: Domain
-//     description: 'Domain of the Tenant'
+//     description: 'Domain of the Site'
 //     required: false
 //     type: string
 //     default: "High End Auto"
@@ -930,11 +913,10 @@ var GetEntityByQuery = func(w http.ResponseWriter, r *http.Request) {
 	var e, entStr string
 
 	entStr = r.URL.Path[5 : len(r.URL.Path)-1]
+	filters := getFiltersFromQueryParams(r)
 
 	//If templates, format them
-	if idx := strings.Index(entStr, "-"); idx != -1 {
-		entStr = entStr[:idx] + "_" + entStr[idx+1:]
-	}
+	entStr = strings.Replace(entStr, "-", "_", 1)
 
 	query := u.ParamsParse(r.URL, u.EntityStrToInt(entStr))
 	js, _ := json.Marshal(query)
@@ -948,7 +930,7 @@ var GetEntityByQuery = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, e = models.GetManyEntities(entStr, bsonMap, nil)
+	data, e = models.GetManyEntities(entStr, bsonMap, filters)
 
 	if len(data) == 0 {
 		resp = u.Message(false, "Error: "+e)
@@ -1008,7 +990,7 @@ var GetEntityByQuery = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 //   - name: id
 //     in: query
-//     description: 'ID of any object.'
+//     description: 'ID or hierarchyName of any object.'
 //     required: true
 // responses:
 //	'200':
@@ -1042,8 +1024,8 @@ var GetTempUnit = func(w http.ResponseWriter, r *http.Request) {
 
 // swagger:operation GET /api/{obj}/{id}/{subent} objects GetFromObject
 // Obtain all objects 2 levels lower in the system.
-// For Example: /api/tenants/{id}/buildings
-// Will return all buildings of a tenant
+// For Example: /api/sites/{id}/buildings
+// Will return all buildings of a site
 // Returns JSON body with all subobjects under the Object
 // ---
 // produces:
@@ -1051,11 +1033,11 @@ var GetTempUnit = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 // - name: obj
 //   in: query
-//   description: 'Indicates the object. Only values of "tenants", "sites",
+//   description: 'Indicates the object. Only values of "sites",
 //   "buildings", "rooms" are acceptable'
 //   required: true
 //   type: string
-//   default: "tenants"
+//   default: "sites"
 // - name: ID
 //   in: query
 //   description: ID of object
@@ -1083,12 +1065,12 @@ var GetTempUnit = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 //   - name: objs
 //     in: query
-//     description: 'Only values of "tenants", "sites",
+//     description: 'Only values of "sites", "domains",
 //     "buildings", "rooms", "racks", "devices", and "stray-devices"
 //     are acceptable'
 //   - name: id
 //     in: query
-//     description: 'ID of the object. For stray-devices and tenants the name
+//     description: 'ID of the object. For stray-devices and Sites the name
 //     can be used as the ID.'
 //   - name: subent
 //     in: query
@@ -1110,13 +1092,9 @@ var GetEntitiesOfAncestor = func(w http.ResponseWriter, r *http.Request) {
 	DispRequestMetaData(r)
 	var id string
 	var e bool
-	//Extract string between /api and /{id}
-	idx := strings.Index(r.URL.Path[5:], "/") + 4
-	entStr := r.URL.Path[5:idx]
-
-	//s, _ := getObjID(id)
+	var resp map[string]interface{}
+	entStr := mux.Vars(r)["ancestor"]
 	enum := u.EntityStrToInt(entStr)
-	//childBase := u.EntityToString(enum + 1)
 
 	//Prevents Mongo from creating a new unidentified collection
 	if enum < 0 {
@@ -1126,29 +1104,22 @@ var GetEntitiesOfAncestor = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := u.Message(true, "success")
-
-	if enum == u.TENANT {
-		id, e = mux.Vars(r)["tenant_name"]
+	if enum == u.SITE {
+		id, e = mux.Vars(r)["site_name"]
 	} else {
 		id, e = mux.Vars(r)["id"]
 	}
 
-	if e == false {
+	if !e {
 		u.Respond(w, u.Message(false, "Error while parsing path parameters"))
 		u.ErrLog("Error while parsing path parameters", "GET CHILDRENOFPARENT", "", r)
 		return
 	}
 
-	lastSlashIdx := strings.LastIndex(r.URL.Path, "/")
-	indicator := r.URL.Path[lastSlashIdx+1:]
-	switch indicator {
-	case "acs", "panels", "corridors", "cabinets", "sensors":
-		indicator = indicator[:len(indicator)-1]
-	default:
-		indicator = ""
-	}
+	//Could be: "ac", "panel", "corridor", "cabinet", "sensor"
+	indicator := mux.Vars(r)["sub"]
 
+	//TODO: hierarchyName
 	data, e1 := models.GetEntitiesOfAncestor(id, enum, entStr, indicator)
 	if data == nil {
 		resp = u.Message(false, "Error while getting "+entStr+"s: "+e1)
@@ -1191,14 +1162,14 @@ var GetEntitiesOfAncestor = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 // - name: objs
 //   in: query
-//   description: 'Indicates the object. Only values of "tenants", "sites",
+//   description: 'Indicates the object. Only values of "sites", "domains"
 //   "buildings", "rooms", "racks", "devices", "stray-devices" are acceptable'
 //   required: true
 //   type: string
 //   default: "sites"
 // - name: ID
 //   in: query
-//   description: 'ID of object. For tenants and stray-devices the name
+//   description: 'ID of object. For Sites and stray-devices the name
 //   can be used as the ID'
 //   required: true
 //   type: int
@@ -1226,12 +1197,12 @@ var GetEntitiesOfAncestor = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 //   - name: objs
 //     in: query
-//     description: 'Only values of "tenants", "sites",
+//     description: 'Only values of "sites", "domains",
 //     "buildings", "rooms", "racks", "devices", and "stray-devices"
 //     are acceptable'
 //   - name: id
 //     in: query
-//     description: 'ID of the object.For tenants and stray-devices the name
+//     description: 'ID of the object.For Sites and stray-devices the name
 //     can be used as the ID'
 //
 // responses:
@@ -1246,61 +1217,34 @@ var GetEntityHierarchy = func(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("FUNCTION CALL: 	 GetEntityHierarchy ")
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
-	//Extract string between /api and /{id}
-	idx := strings.Index(r.URL.Path[5:], "/") + 4
-	entity := r.URL.Path[5:idx]
-	resp := u.Message(true, "success")
+	entity := mux.Vars(r)["entity"]
+	var resp map[string]interface{}
 	var limit int
 	var end int
-	var lastSlashIdx int
+	var entInt int
 	var data map[string]interface{}
 	var e1 string
-	var indicator string
 
 	//If template or stray convert '-' -> '_'
-	if idx := strings.Index(entity, "-"); idx != -1 {
-		entity = entity[:idx] + "_" + entity[idx+1:]
-	}
+	entity = strings.Replace(entity, "-", "_", 1)
 
 	id, e := mux.Vars(r)["id"]
-	if e == false {
-
-		if entity != "tenant" {
-			u.Respond(w, u.Message(false, "Error while parsing path parameters"))
-			u.ErrLog("Error while parsing path parameters", "GET ENTITYHIERARCHY", "", r)
-			return
-		}
-		id, e = mux.Vars(r)["tenant_name"]
-
-		if e == false {
-			u.Respond(w, u.Message(false, "Error while parsing tenant name"))
-			u.ErrLog("Error while parsing path parameters", "GET ENTITYHIERARCHY", "", r)
-			return
-		}
-	}
-
-	if entity == "tenant" {
-
-		_, e := models.GetEntity(bson.M{"name": id}, entity)
-		if e != "" {
-			resp = u.Message(false, "Error while getting :"+entity+","+e)
-			u.ErrLog("Error while getting "+entity, "GET "+entity, e, r)
-		}
-
+	if !e {
+		u.Respond(w, u.Message(false, "Error while parsing path parameters"))
+		u.ErrLog("Error while parsing path parameters", "GET ENTITYHIERARCHY", "", r)
+		return
 	}
 
 	//Check if the request is a ranged hierarchy
-	arr := strings.SplitAfter(r.URL.RawQuery, "limit=")
-	if len(arr) == 2 { //limit={number} was provided
-		end, _ = strconv.Atoi(arr[1])
+	filters := getFiltersFromQueryParams(r)
+	if len(filters.Limit) > 0 { //limit={number} was provided
+		end, _ = strconv.Atoi(filters.Limit)
 		limit = u.EntityStrToInt(entity) + end
 
-		// HACK SECTION FOR FRONT END -- START //
-
 		if end == 0 {
-
+			// It's a GetEntity, treat it here
 			objID, _ := primitive.ObjectIDFromHex(id)
-			data, e1 := models.GetEntity(bson.M{"_id": objID}, entity)
+			data, e1 := models.GetEntity(bson.M{"_id": objID}, entity, filters)
 
 			if e1 != "" {
 				resp = u.Message(false, "Error while getting :"+entity+","+e1)
@@ -1325,34 +1269,30 @@ var GetEntityHierarchy = func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// HACK SECTION FOR FRONT END -- DONE //
-
 	} else {
+		//arbitrarily set value to 999
+		limit = 999
 
-		lastSlashIdx = strings.LastIndex(r.URL.Path, "/")
-		indicator = r.URL.Path[lastSlashIdx+1:]
-		switch indicator {
-		case "all":
-			//arbitrarily set value to 999 instead of AC
-			limit = 999
-		case "nonstd":
-			//special case
-		default:
-			//set to int equivalent
-			//This strips the trailing s
-			limit = u.EntityStrToInt(indicator[:len(indicator)-1])
+		//Verify that the entire URL is valid
+		arr := (strings.Split(r.URL.Path, "/")[4:])
+		entInt = u.EntityStrToInt(entity)
+		for i, item := range arr {
+			eltInt := u.EntityStrToInt(item[:len(item)-1])
+			if (eltInt < 0 || eltInt <= entInt) && item != "all" {
+				w.WriteHeader(http.StatusBadRequest)
+				resp = u.Message(false, "Invalid object in URL: "+arr[i])
+				u.Respond(w, resp)
+				return
+			}
 		}
 	}
 
-	println("Indicator: ", indicator)
 	println("The limit is: ", limit)
-
 	oID, _ := getObjID(id)
-
 	entNum := u.EntityStrToInt(entity)
 	println("EntNum:", entNum)
 
-	//Prevents Mongo from creating a new unidentified collection
+	// Prevents Mongo from creating a new unidentified collection
 	if entNum < 0 {
 		w.WriteHeader(http.StatusNotFound)
 		u.Respond(w, u.Message(false, "Invalid object in URL:"+entity+" Please provide a valid object"))
@@ -1360,21 +1300,9 @@ var GetEntityHierarchy = func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get hierarchy
 	println("Entity: ", entity, " & OID: ", oID.Hex())
-	if entity == "device" {
-		println("RETREIVE")
-		end = 999 //Arbitrary value for just obtaining everything
-		arr := strings.SplitAfter(r.URL.RawQuery, "limit=")
-		if len(arr) == 2 { //limit={number} was provided
-			end, _ = strconv.Atoi(arr[1])
-			end += 1
-		}
-		//data, e1 = models.RetrieveDeviceHierarch(oID, 0, end)
-		data, e1 = models.GetEntityHierarchy(oID, entity, entNum, limit)
-	} else {
-		//data, e1 = models.GetEntityHierarchy(entity, oID, entNum, limit)
-		data, e1 = models.GetEntityHierarchy(oID, entity, entNum, limit)
-	}
+	data, e1 = models.GetEntityHierarchy(oID, entity, entNum, limit, filters)
 
 	if data == nil {
 		resp = u.Message(false, "Error while getting :"+entity+","+e1)
@@ -1389,20 +1317,6 @@ var GetEntityHierarchy = func(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else {
-		//object := ""
-		//message := ""
-		//if indicator == "" {
-		//	object = u.EntityToString(limit)
-		//	message = "successfully got " + entity + "'s hierarchy to " + object
-		//} else {
-		//	if indicator == "all" {
-		//		message = "successfully got " + entity + "'s complete hierarchy"
-		//	} else {
-		//		message = "successfully got " + entity + "'s hierarchy to " + indicator
-		//	}
-
-		//}
-
 		resp = u.Message(true, "successfully got object")
 	}
 
@@ -1415,16 +1329,52 @@ var GetEntityHierarchy = func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// swagger:operation GET /api/hierarchy objects GetCompleteHierarchy
+// Returns all objects hierarchyName arranged by relationship (father:[children])
+// and category (category:[objects])
+// ---
+// produces:
+// - application/json
+// responses:
+//
+//	'200':
+//	    description: 'Request is valid.'
+//	'500':
+//	    description: Server error.
+var GetCompleteHierarchy = func(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("******************************************************")
+	fmt.Println("FUNCTION CALL: 	 GetCompleteHierarchy ")
+	fmt.Println("******************************************************")
+	DispRequestMetaData(r)
+	var resp map[string]interface{}
+
+	data, err := models.GetCompleteHierarchy()
+	if err != "" {
+		w.WriteHeader(http.StatusInternalServerError)
+		resp = u.Message(false, "Error: "+err)
+	} else {
+		if r.Method == "OPTIONS" {
+			w.Header().Add("Content-Type", "application/json")
+			w.Header().Add("Allow", "GET, OPTIONS, HEAD")
+		} else {
+			resp = u.Message(true, "successfully got hierarchy")
+			resp["data"] = data
+		}
+	}
+
+	u.Respond(w, resp)
+}
+
 // swagger:operation GET /api/{entity}/{name}/all objects GetFromObject
-// Obtain all objects related to Tenant or stray-device in the system using name.
-// Returns JSON body with all subobjects under the Tenant
+// Obtain all objects related to Site or stray-device in the system using name.
+// Returns JSON body with all subobjects
 // ---
 // produces:
 // - application/json
 // parameters:
 // - name: name
 //   in: query
-//   description: Name of Tenant
+//   description: Name of Site
 //   required: true
 //   type: int
 //   default: 999
@@ -1443,7 +1393,7 @@ var GetEntityHierarchy = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 //   - name: name
 //     in: query
-//     description: 'Name of tenant.'
+//     description: 'Name of site.'
 //
 // responses:
 //
@@ -1457,101 +1407,47 @@ var GetHierarchyByName = func(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("FUNCTION CALL: 	 GetHierarchyByName ")
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
-	entity := "tenant"
-	resp := u.Message(true, "success")
-	var indicator string
+	var resp map[string]interface{}
 	var limit int
-	var lastSlashIdx int
-	var end int
 
-	id, e := mux.Vars(r)["name"]
-	if e == false {
+	name, e := mux.Vars(r)["name"]
+	if !e {
 		u.Respond(w, u.Message(false, "Error while parsing name"))
 		u.ErrLog("Error while parsing path parameters", "GetHierarchyByName", "", r)
 		return
 	}
 
 	entity, e2 := mux.Vars(r)["entity"]
-	if e2 == false {
+	if !e2 {
 		u.Respond(w, u.Message(false, "Error while parsing entity"))
 		u.ErrLog("Error while parsing path parameters", "GetHierarchyByName", "", r)
 		return
 	}
 
-	entity = entity[:len(entity)-1]
+	// If template or stray convert '-' -> '_'
+	entity = strings.Replace(entity, "-", "_", 1)
 
-	//If template or stray convert '-' -> '_'
-	if idx := strings.Index(entity, "-"); idx != -1 {
-		entity = entity[:idx] + "_" + entity[idx+1:]
-	}
-
-	if entity != "tenant" && entity != "stray_device" {
-		u.Respond(w, u.Message(false, "Error invalid entity provided"))
-		u.ErrLog("Invalid entity found while parsing path parameters", "GetHierarchyByName", "", r)
-		return
-	}
-
-	//Check if the request is a ranged hierarchy
-	arr := strings.SplitAfter(r.URL.RawQuery, "limit=")
-	if len(arr) == 2 { //limit={number} was provided
-		end, _ = strconv.Atoi(arr[1])
-		limit = u.EntityStrToInt(entity) + end
-
-		// HACK SECTION FOR FRONT END -- START //
-
-		if end == 0 {
-
-			//objID, _ := primitive.ObjectIDFromHex(id)
-			data, e1 := models.GetEntity(bson.M{"name": id}, "tenant")
-
-			if e1 != "" {
-				resp = u.Message(false, "Error while getting :"+entity+","+e1)
-				u.ErrLog("Error while getting "+entity, "GET "+entity, e1, r)
-
-				switch e1 {
-				case "record not found":
-					w.WriteHeader(http.StatusNotFound)
-				default:
-				}
-			} else {
-				resp = u.Message(true, "successfully got object")
-			}
-
-			resp["data"] = data
-			u.Respond(w, resp)
-			return
-		}
-
-		// HACK SECTION FOR FRONT END -- DONE //
-
+	// Check if the request is a ranged hierarchy
+	filters := getFiltersFromQueryParams(r)
+	if len(filters.Limit) > 0 {
+		//limit={number} was provided
+		limit, _ = strconv.Atoi(filters.Limit)
 	} else {
-
-		lastSlashIdx = strings.LastIndex(r.URL.Path, "/")
-		indicator = r.URL.Path[lastSlashIdx+1:]
-		switch indicator {
-		case "all":
-			//set to AC1
-			if entity == "tenant" {
-				limit = u.AC
-			} else { //set limit for stray_device
-				limit = 99
-			}
-
-		case "nonstd":
-			//special case
-		default:
-			//set to int equivalent
-			//This strips the trailing s
-			limit = u.EntityStrToInt(indicator[:len(indicator)-1])
-		}
+		limit = 999
 	}
-
-	println("Indicator: ", indicator)
 	println("The limit is: ", limit)
 
-	entInt := u.EntityStrToInt(entity)
-
-	data, e1 := models.GetHierarchyByName(entity, id, entInt, limit)
+	// Get hierarchy
+	var req primitive.M
+	if entity == "site" {
+		req = bson.M{"name": name}
+	} else {
+		req = bson.M{"hierarchyName": name}
+	}
+	data, e1 := models.GetEntity(req, entity, filters)
+	if limit >= 1 && e1 == "" {
+		data["children"], e1 = models.GetHierarchyByName(entity, name, limit, filters)
+	}
 
 	if data == nil {
 		resp = u.Message(false, "Error while getting :"+entity+","+e1)
@@ -1570,19 +1466,6 @@ var GetHierarchyByName = func(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else {
-		//object := ""
-		//message := ""
-		//if indicator == "" {
-		//	object = u.EntityToString(limit)
-		//	message = "successfully got " + entity + "'s hierarchy to " + object
-		//} else {
-		//	if indicator == "all" {
-		//		message = "successfully got " + entity + "'s complete hierarchy"
-		//	} else {
-		//		message = "successfully got " + entity + "'s hierarchy to " + indicator
-		//	}
-
-		//}
 		resp = u.Message(true, "successfully got object")
 	}
 
@@ -1595,7 +1478,7 @@ var GetHierarchyByName = func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// swagger:operation GET /api/{objs}/{id}/* objects GetFromObect
+// swagger:operation GET /api/{objs}/{id}/* objects GetFromObject
 // A category of objects of a Parent Object can be retrieved from the system.
 // The path can only contain object type or object names
 // ---
@@ -1604,14 +1487,14 @@ var GetHierarchyByName = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 // - name: objs
 //   in: query
-//   description: 'Indicates the object. Only values of "tenants", "sites",
+//   description: 'Indicates the object. Only values of "sites", "domains",
 //   "buildings", "rooms", "racks", "devices", "stray-devices" are acceptable'
 //   required: true
 //   type: string
 //   default: "sites"
 // - name: ID
 //   in: path
-//   description: 'ID of desired object. For tenants and stray-devices the name
+//   description: 'ID of desired object. For Sites and stray-devices the name
 //   can be used as the ID'
 //   required: true
 //   type: string
@@ -1641,12 +1524,12 @@ var GetHierarchyByName = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 //   - name: objs
 //     in: query
-//     description: 'Only values of "tenants", "sites",
+//     description: 'Only values of "sites", "domains",
 //     "buildings", "rooms", "racks", "devices", and "stray-devices"
 //     are acceptable'
 //   - name: id
 //     in: query
-//     description: 'ID of the object.For tenants and stray-devices the name
+//     description: 'ID of the object.For Sites and stray-devices the name
 //     can be used as the ID'
 //   - name: '*'
 //     in: path
@@ -1671,18 +1554,15 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 	fmt.Println("FUNCTION CALL: 	 GetEntitiesUsingNamesOfParents ")
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
-	//Extract string between /api and /{id}
-	idx := strings.Index(r.URL.Path[5:], "/") + 4
-	entity := r.URL.Path[5:idx]
-	resp := u.Message(true, "success")
+	entity := mux.Vars(r)["entity"]
+	var entityInt int
+	var resp map[string]interface{}
 
 	//If template or stray convert '-' -> '_'
-	if idx := strings.Index(entity, "-"); idx != -1 {
-		entity = entity[:idx] + "_" + entity[idx+1:]
-	}
+	entity = strings.Replace(entity, "-", "_", 1)
 
 	id, e := mux.Vars(r)["id"]
-	tname, e1 := mux.Vars(r)["tenant_name"]
+	tname, e1 := mux.Vars(r)["site_name"]
 	if e == false && e1 == false {
 		u.Respond(w, u.Message(false, "Error while parsing path parameters"))
 		u.ErrLog("Error while parsing path parameters", "GET ENTITIESUSINGANCESTORNAMES", "", r)
@@ -1690,7 +1570,8 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 	}
 
 	//Prevents Mongo from creating a new unidentified collection
-	if u.EntityStrToInt(entity) < 0 {
+	entityInt = u.EntityStrToInt(entity)
+	if entityInt < 0 {
 		w.WriteHeader(http.StatusNotFound)
 		u.Respond(w, u.Message(false, "Invalid object in URL:"+entity+" Please provide a valid object"))
 		u.ErrLog("Cannot get invalid object", "GET ENTITIESUSINGANCESTORNAMES "+entity, "", r)
@@ -1705,36 +1586,34 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 		key := k[:len(k)-1]
 
 		//If templates, format them
-		if idx := strings.Index(key, "-"); idx != -1 {
-			key = key[:idx] + "_" + key[idx+1:]
+		key = strings.Replace(key, "-", "_", 1)
+
+		//Invalid object to retrieve was given
+		keyInt := u.EntityStrToInt(key)
+
+		//Only check even indices, since they have
+		//the object categories
+		if (keyInt < 0 || entityInt >= keyInt) && k != "all" && i%2 == 0 {
+			resp = u.Message(false, entity+"s do not have '"+k+"'")
+			resp["data"] = map[string]interface{}{}
+			u.ErrLog("Invalid objects in URL: "+k, "GET "+entity, "", r)
+			w.WriteHeader(http.StatusBadRequest)
+			u.Respond(w, resp)
+			return
 		}
 
 		if i%2 == 0 { //The keys (entities) are at the even indexes
-			if i+1 >= len(arr) {
-				//Small front end hack since client wants stray-device URLs
-				//to be like: URL/stray-devices/ID/devices
-				if key == "device" && entity == "stray_device" {
-					key = "stray_device"
-				}
 
+			//Small front end hack since client wants stray-device URLs
+			//to be like: URL/stray-devices/ID/devices
+			if key == "device" && entity == "stray_device" {
+				key = "stray_device"
+			}
+
+			if i+1 >= len(arr) {
 				ancestry = append(ancestry,
 					map[string]string{key: "all"})
 			} else {
-
-				//Prevents Mongo from creating a new unidentified collection
-				if u.EntityStrToInt(key) < 0 {
-					w.WriteHeader(http.StatusNotFound)
-					u.Respond(w, u.Message(false, "Invalid object in URL:"+key+" Please provide a valid object"))
-					u.ErrLog("Cannot get invalid object", "GET "+key, "", r)
-					return
-				}
-
-				//Small front end hack since client wants stray-device URLs
-				//to be like: URL/stray-devices/ID/devices/ID/devices
-				if key == "device" && entity == "stray_device" {
-					key = "stray_device"
-				}
-
 				ancestry = append(ancestry,
 					map[string]string{key: arr[i+1]})
 			}
@@ -1746,15 +1625,15 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 	if len(arr)%2 != 0 { //This means we are getting entities
 		var data []map[string]interface{}
 		var e3 string
-		if e1 == true {
+		if e1 {
 			println("we are getting entities here")
-			data, e3 = models.GetEntitiesUsingTenantAsAncestor(entity, tname, ancestry)
+			data, e3 = models.GetEntitiesUsingSiteAsAncestor(entity, tname, ancestry)
 
 		} else {
 			data, e3 = models.GetEntitiesUsingAncestorNames(entity, oID, ancestry)
 		}
 
-		if data == nil || len(data) == 0 {
+		if len(data) == 0 {
 			resp = u.Message(false, "Error while getting :"+entity+","+e3)
 			u.ErrLog("Error while getting "+entity, "GET "+entity, e3, r)
 
@@ -1789,13 +1668,12 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 		var data map[string]interface{}
 		var e3 string
 		if e1 == true {
-			data, e3 = models.GetEntityUsingTenantAsAncestor(entity, tname, ancestry)
+			data, e3 = models.GetEntityUsingSiteAsAncestor(entity, tname, ancestry)
 		} else {
 			data, e3 = models.GetEntityUsingAncestorNames(entity, oID, ancestry)
 		}
 
-		//data, e := models.GetEntityUsingAncestorNames(entity, oID, ancestry)
-		if data == nil || len(data) == 0 {
+		if len(data) == 0 {
 			resp = u.Message(false, "Error while getting :"+entity+","+e3)
 			u.ErrLog("Error while getting "+entity, "GET "+entity, e3, r)
 
@@ -1817,8 +1695,6 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 			}
 
 		} else {
-			upperEnt := arr[len(arr)-2]
-			upperEnt = upperEnt[:len(upperEnt)-1]
 			resp = u.Message(true, "successfully got object")
 		}
 
@@ -1841,9 +1717,9 @@ var GetEntitiesUsingNamesOfParents = func(w http.ResponseWriter, r *http.Request
 // parameters:
 //   - name: objs
 //     in: query
-//     description: 'Only values of "tenants", "sites",
+//     description: 'Only values of "sites",
 //     "buildings", "rooms", "racks", "devices", "room-templates",
-//     "obj-templates", "bldg-templates","rooms", "acs", "panels",
+//     "obj-templates","bldg-templates", "rooms", "acs", "panels",
 //     "cabinets", "groups", "corridors","sensors","stray-devices"
 //     "stray-sensors" are acceptable'
 //
@@ -1859,8 +1735,7 @@ var BaseOption = func(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("******************************************************")
 	DispRequestMetaData(r)
 	entity, e1 := mux.Vars(r)["entity"]
-	entity = entity[:len(entity)-1]
-	if e1 == false || u.EntityStrToInt(entity) == -1 {
+	if !e1 || u.EntityStrToInt(entity) == -1 {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -1904,7 +1779,7 @@ var GetStats = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 // - name: objs
 //   in: query
-//   description: 'Indicates the Object. Only values of "tenants", "sites",
+//   description: 'Indicates the Object. Only values of "domains", "sites",
 //   "buildings", "rooms", "racks", "devices", "acs", "panels",
 //   "cabinets", "groups", "corridors",
 //   "room-templates", "obj-templates", "bldg-templates","sensors", "stray-devices"
@@ -1931,7 +1806,7 @@ var GetStats = func(w http.ResponseWriter, r *http.Request) {
 //   default: 999
 // - name: ParentID
 //   description: 'All objects are linked to a
-//   parent with the exception of Tenant since it has no parent'
+//   parent with the exception of Site since it has no parent'
 //   required: true
 //   type: int
 //   default: 999
@@ -1965,9 +1840,9 @@ var GetStats = func(w http.ResponseWriter, r *http.Request) {
 // parameters:
 //   - name: obj
 //     in: query
-//     description: 'Only values of "tenants", "sites",
+//     description: 'Only values of "domains", "sites",
 //     "buildings", "rooms", "racks", "devices", "room-templates",
-//     "obj-templates", "bldg-templates","rooms", "acs", "panels",
+//     "obj-templates","bldg-templates", "rooms", "acs", "panels",
 //     "cabinets", "groups", "corridors","sensors","stray-devices"
 //     "stray-sensors" are acceptable'
 //
@@ -1984,7 +1859,6 @@ var ValidateEntity = func(w http.ResponseWriter, r *http.Request) {
 	DispRequestMetaData(r)
 	var obj map[string]interface{}
 	entity, e1 := mux.Vars(r)["entity"]
-	entity = entity[:len(entity)-1]
 
 	//If templates or stray-devices, format them
 	if idx := strings.Index(entity, "-"); idx != -1 {
@@ -1993,7 +1867,7 @@ var ValidateEntity = func(w http.ResponseWriter, r *http.Request) {
 	}
 	entInt := u.EntityStrToInt(entity)
 
-	if e1 == false || entInt == -1 {
+	if !e1 || entInt == -1 {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -2013,7 +1887,7 @@ var ValidateEntity = func(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ans, status := models.ValidateEntity(entInt, obj)
-	if status == true {
+	if status {
 		u.Respond(w, map[string]interface{}{"status": true, "message": "This object can be created"})
 		return
 	}
@@ -2053,11 +1927,13 @@ var Version = func(w http.ResponseWriter, r *http.Request) {
 			"BuildHash":  u.GetBuildHash(),
 			"CommitDate": u.GetCommitDate(),
 			"BuildTree":  u.GetBuildTree(),
+			"Customer":   models.GetDBName(),
 		}
 	}
 	u.Respond(w, data)
 }
 
+// DEAD CODE
 var GetEntityHierarchyNonStd = func(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("******************************************************")
 	fmt.Println("FUNCTION CALL: 	 GetEntityHierarchyNonStd ")
@@ -2075,7 +1951,7 @@ var GetEntityHierarchyNonStd = func(w http.ResponseWriter, r *http.Request) {
 	//result := map[string][]map[string]interface{}{}
 
 	if e == false {
-		if id, e1 = mux.Vars(r)["tenant_name"]; e1 == false {
+		if id, e1 = mux.Vars(r)["site_name"]; e1 == false {
 			u.Respond(w, u.Message(false, "Error while parsing path parameters"))
 			u.ErrLog("Error while parsing path parameters", "GETHIERARCHYNONSTD", "", r)
 			return
@@ -2084,16 +1960,16 @@ var GetEntityHierarchyNonStd = func(w http.ResponseWriter, r *http.Request) {
 
 	entNum := u.EntityStrToInt(entity)
 
-	if entity == "tenant" {
-		println("Getting TENANT HEIRARCHY")
+	if entity == "site" {
+		println("Getting SITE HEIRARCHY")
 		println("With ID: ", id)
-		data, err = models.GetHierarchyByName(entity, id, entNum, u.AC)
-		if err != "" {
-			println("We have ERR")
-		}
+		// data, err = models.GetHierarchyByName(entity, id, entNum, u.AC)
+		// if err != "" {
+		// 	println("We have ERR")
+		// }
 	} else {
 		oID, _ := getObjID(id)
-		data, err = models.GetEntityHierarchy(oID, entity, entNum, u.AC)
+		data, err = models.GetEntityHierarchy(oID, entity, entNum, u.AC, u.RequestFilters{})
 	}
 
 	if data == nil {
@@ -2120,4 +1996,64 @@ var GetEntityHierarchyNonStd = func(w http.ResponseWriter, r *http.Request) {
 	resp["racks"] = racks
 	resp["devices"] = devices*/
 	u.Respond(w, resp)
+}
+
+// DEAD CODE
+func parseDataForNonStdResult(ent string, eNum int, data map[string]interface{}) map[string][]map[string]interface{} {
+
+	ans := map[string][]map[string]interface{}{}
+	add := []map[string]interface{}{}
+
+	firstIndex := u.EntityToString(eNum + 1)
+	firstArr := data[firstIndex+"s"].([]map[string]interface{})
+
+	ans[firstIndex+"s"] = firstArr
+
+	for i := range firstArr {
+		nxt := u.EntityToString(eNum + 2)
+		add = append(add, firstArr[i][nxt+"s"].([]map[string]interface{})...)
+	}
+
+	ans[u.EntityToString(eNum+2)+"s"] = add
+	newAdd := []map[string]interface{}{}
+	for i := range add {
+		nxt := u.EntityToString(eNum + 3)
+		newAdd = append(newAdd, add[i][nxt+"s"].([]map[string]interface{})...)
+	}
+
+	ans[u.EntityToString(eNum+3)+"s"] = newAdd
+
+	newAdd2 := []map[string]interface{}{}
+	for i := range newAdd {
+		nxt := u.EntityToString(eNum + 4)
+		newAdd2 = append(newAdd2, newAdd[i][nxt+"s"].([]map[string]interface{})...)
+	}
+
+	ans[u.EntityToString(eNum+4)+"s"] = newAdd2
+	newAdd3 := []map[string]interface{}{}
+
+	for i := range newAdd2 {
+		nxt := u.EntityToString(eNum + 5)
+		newAdd3 = append(newAdd3, newAdd2[i][nxt+"s"].([]map[string]interface{})...)
+	}
+	ans[u.EntityToString(eNum+5)+"s"] = newAdd3
+
+	newAdd4 := []map[string]interface{}{}
+
+	for i := range newAdd3 {
+		nxt := u.EntityToString(eNum + 6)
+		newAdd4 = append(newAdd4, newAdd3[i][nxt+"s"].([]map[string]interface{})...)
+	}
+
+	ans[u.EntityToString(eNum+6)+"s"] = newAdd4
+
+	newAdd5 := []map[string]interface{}{}
+
+	for i := range newAdd4 {
+		nxt := u.EntityToString(eNum + 7)
+		newAdd5 = append(newAdd5, newAdd4[i][nxt+"s"].([]map[string]interface{})...)
+	}
+
+	ans[u.EntityToString(eNum+7)+"s"] = newAdd5
+	return ans
 }

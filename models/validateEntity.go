@@ -1,44 +1,84 @@
 package models
 
 import (
-	"encoding/hex"
-	"encoding/json"
+	"embed"
+	"fmt"
 	u "p3/utils"
 	"strconv"
 	"strings"
 
+	"github.com/santhosh-tekuri/jsonschema/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+//go:embed schemas/*.json
+//go:embed schemas/refs/*.json
+var embeddfs embed.FS
+var c *jsonschema.Compiler
+
+func init() {
+	// Load JSON schemas
+	c = jsonschema.NewCompiler()
+	println("Loaded json schemas for validation:")
+	loadJsonSchemas("")
+	loadJsonSchemas("refs/")
+	println()
+}
+
+func loadJsonSchemas(schemaPrefix string) {
+	var schemaPath = "schemas/"
+	dir := strings.Trim(schemaPath+schemaPrefix, "/") // without trailing '/'
+	entries, err := embeddfs.ReadDir((dir))
+	if err != nil {
+		println(err.Error())
+	}
+
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".json") {
+			file, err := embeddfs.Open(schemaPath + schemaPrefix + e.Name())
+			if err == nil {
+				print(schemaPrefix + e.Name() + " ")
+				c.AddResource(schemaPrefix+e.Name(), file)
+			}
+		}
+	}
+}
+
 func validateParent(ent string, entNum int, t map[string]interface{}) (map[string]interface{}, bool) {
 
-	if entNum == u.TENANT {
+	if entNum == u.SITE {
 		return nil, true
 	}
 
 	//Check ParentID is valid
-	if t["parentId"] == nil {
+	if t["parentId"] == nil || t["parentId"] == "" {
 		return u.Message(false, "ParentID is not valid"), false
 	}
-
 	objID, err := primitive.ObjectIDFromHex(t["parentId"].(string))
-	if err != nil {
-		return u.Message(false, "ParentID is not valid"), false
+	var req primitive.M
+	if err == nil {
+		// parentId given with ID
+		req = bson.M{"_id": objID}
+	} else {
+		// parentId given with hierarchyName
+		req = bson.M{"hierarchyName": t["parentId"].(string)}
 	}
 
 	parent := map[string]interface{}{"parent": ""}
 	switch entNum {
 	case u.DEVICE:
-		x, _ := GetEntity(bson.M{"_id": objID}, "rack")
+		x, _ := GetEntity(req, "rack", u.RequestFilters{})
 		if x != nil {
 			parent["parent"] = "rack"
+			parent["hierarchyName"] = getHierarchyName(x)
 			return parent, true
 		}
 
-		y, _ := GetEntity(bson.M{"_id": objID}, "device")
+		y, _ := GetEntity(req, "device", u.RequestFilters{})
 		if y != nil {
 			parent["parent"] = "device"
+			parent["hierarchyName"] = getHierarchyName(y)
 			return parent, true
 		}
 
@@ -46,27 +86,31 @@ func validateParent(ent string, entNum int, t map[string]interface{}) (map[strin
 			"ParentID should be correspond to Existing ID"), false
 
 	case u.SENSOR, u.GROUP:
-		w, _ := GetEntity(bson.M{"_id": objID}, "device")
+		w, _ := GetEntity(req, "device", u.RequestFilters{})
 		if w != nil {
 			parent["parent"] = "device"
+			parent["hierarchyName"] = getHierarchyName(w)
 			return parent, true
 		}
 
-		x, _ := GetEntity(bson.M{"_id": objID}, "rack")
+		x, _ := GetEntity(req, "rack", u.RequestFilters{})
 		if x != nil {
 			parent["parent"] = "rack"
+			parent["hierarchyName"] = getHierarchyName(x)
 			return parent, true
 		}
 
-		y, _ := GetEntity(bson.M{"_id": objID}, "room")
+		y, _ := GetEntity(req, "room", u.RequestFilters{})
 		if y != nil {
 			parent["parent"] = "room"
+			parent["hierarchyName"] = getHierarchyName(y)
 			return parent, true
 		}
 
-		z, _ := GetEntity(bson.M{"_id": objID}, "building")
+		z, _ := GetEntity(req, "building", u.RequestFilters{})
 		if z != nil {
 			parent["parent"] = "building"
+			parent["hierarchyName"] = getHierarchyName(z)
 			return parent, true
 		}
 
@@ -78,13 +122,15 @@ func validateParent(ent string, entNum int, t map[string]interface{}) (map[strin
 			if pid, ok := t["parentId"].(string); ok {
 				ID, _ := primitive.ObjectIDFromHex(pid)
 
-				ctx, cancel := u.Connect()
-				if GetDB().Collection("stray_device").FindOne(ctx,
-					bson.M{"_id": ID}).Err() != nil {
+				p, err := GetEntity(bson.M{"_id": ID}, "stray_device", u.RequestFilters{})
+				if len(p) > 0 {
+					parent["parent"] = "stray_device"
+					parent["hierarchyName"] = getHierarchyName(p)
+					return parent, true
+				} else if err != "" {
 					return u.Message(false,
 						"ParentID should be an Existing ID or null"), false
 				}
-				defer cancel()
 			} else {
 				return u.Message(false,
 					"ParentID should be an Existing ID or null"), false
@@ -93,20 +139,74 @@ func validateParent(ent string, entNum int, t map[string]interface{}) (map[strin
 
 	default:
 		parentInt := u.GetParentOfEntityByInt(entNum)
-		parent := u.EntityToString(parentInt)
+		parentStr := u.EntityToString(parentInt)
 
-		ctx, cancel := u.Connect()
-		if GetDB().Collection(parent).
-			FindOne(ctx, bson.M{"_id": objID}).Err() != nil {
+		p, err := GetEntity(req, parentStr, u.RequestFilters{})
+		if len(p) > 0 {
+			parent["parent"] = parentStr
+			parent["hierarchyName"] = getHierarchyName(p)
+			return parent, true
+		} else if err != "" {
 			println("ENTITY VALUE: ", ent)
 			println("We got Parent: ", parent, " with ID:", t["parentId"].(string))
 			return u.Message(false,
 				"ParentID should correspond to Existing ID"), false
-
 		}
-		defer cancel()
 	}
 	return nil, true
+}
+
+func getHierarchyName(parent map[string]interface{}) string {
+	if parent["hierarchyName"] != nil {
+		return parent["hierarchyName"].(string)
+	} else {
+		return parent["name"].(string)
+	}
+}
+
+func validateJsonSchema(entity int, t map[string]interface{}) (map[string]interface{}, bool) {
+	// Get JSON schema
+	var schemaName string
+	switch entity {
+	case u.AC, u.CABINET, u.PWRPNL:
+		schemaName = "base_schema.json"
+	case u.STRAYDEV, u.STRAYSENSOR:
+		schemaName = "stray_schema.json"
+	default:
+		schemaName = u.EntityToString(entity) + "_schema.json"
+	}
+
+	sch, err := c.Compile(schemaName)
+	if err != nil {
+		return u.Message(false, err.Error()), false
+	}
+
+	// Validate JSON Schema
+	if err := sch.Validate(t); err != nil {
+		switch v := err.(type) {
+		case *jsonschema.ValidationError:
+			fmt.Println(t)
+			println(v.GoString())
+			resp := u.Message(false, "JSON body doesn't validate with the expected JSON schema")
+			// Format errors array
+			errSlice := []string{}
+			for _, schErr := range v.BasicOutput().Errors {
+				if len(schErr.Error) > 0 && !strings.Contains(schErr.Error, "doesn't validate with") {
+					if len(schErr.InstanceLocation) > 0 {
+						errSlice = append(errSlice, schErr.InstanceLocation+" "+schErr.Error)
+					} else {
+						errSlice = append(errSlice, schErr.Error)
+					}
+				}
+			}
+			resp["errors"] = errSlice
+			return resp, false
+		}
+		return u.Message(false, err.Error()), false
+	} else {
+		println("JSON Schema: all good, validated!")
+		return nil, true
+	}
 }
 
 func ValidatePatch(ent int, t map[string]interface{}) (map[string]interface{}, bool) {
@@ -123,10 +223,14 @@ func ValidatePatch(ent int, t map[string]interface{}) (map[string]interface{}, b
 			}
 
 		case "parentId":
-			if ent < u.ROOMTMPL && ent > u.TENANT {
+			if ent < u.ROOMTMPL && ent > u.SITE {
 				x, ok := validateParent(u.EntityToString(ent), ent, t)
 				if !ok {
 					return x, ok
+				} else if x["hierarchyName"] != nil {
+					t["hierarchyName"] = x["hierarchyName"].(string) + "." + t["name"].(string)
+				} else {
+					println("WARN: Unable to set hierarchyName")
 				}
 			}
 			//u.STRAYDEV's schema is very loose
@@ -135,14 +239,6 @@ func ValidatePatch(ent int, t map[string]interface{}) (map[string]interface{}, b
 				x, ok := ValidateEntity(ent, t)
 				if !ok {
 					return x, ok
-				}
-			}
-
-		case "attributes.color": // u.TENANT
-			if ent == u.TENANT {
-				if v, _ := t[k]; v == nil {
-					return u.Message(false,
-						"Field: "+k+" cannot nullified!"), false
 				}
 			}
 
@@ -172,8 +268,8 @@ func ValidatePatch(ent int, t map[string]interface{}) (map[string]interface{}, b
 				}
 			}
 
-		case "attributes": //u.TENANT ... u.SENSOR, u.OBJTMPL
-			if (ent >= u.TENANT && ent < u.ROOMTMPL) || ent == u.OBJTMPL {
+		case "attributes": //u.SITE ... u.SENSOR, u.OBJTMPL
+			if (ent >= u.SITE && ent < u.ROOMTMPL) || ent == u.OBJTMPL {
 				if v, _ := t[k]; v == nil {
 					return u.Message(false,
 						"Field: "+k+" cannot nullified!"), false
@@ -254,41 +350,31 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 		and check that the device parent has a slot
 		attribute
 	*/
+
+	// Validate JSON Schema
+	if resp, err := validateJsonSchema(entity, t); !err {
+		return resp, false
+	}
+
+	// Extra checks
 	switch entity {
-	case u.TENANT, u.SITE, u.BLDG, u.ROOM, u.RACK, u.DEVICE, u.AC,
-		u.PWRPNL, u.CABINET, u.CORIDOR, u.SENSOR, u.GROUP:
-		if t["name"] == nil || t["name"] == "" {
-			return u.Message(false, "Name should be on payload"), false
-		}
-
-		if t["category"] == nil || t["category"] == "" {
-			return u.Message(false, "Category should be on the payload"), false
-		}
-
-		if t["domain"] == nil || t["domain"] == "" {
-			return u.Message(false, "Domain should be on the payload"), false
-		}
-
-		if t["description"] == nil || t["description"] == "" {
-			return u.Message(false,
-				"Description should be on the payload as an array"), false
-		}
-
-		if _, ok := t["description"].([]interface{}); !ok {
-			return u.Message(false, "Description should be an array type"), false
-		}
-
+	case u.SITE, u.BLDG, u.ROOM, u.RACK, u.DEVICE, u.AC,
+		u.PWRPNL, u.CABINET, u.CORRIDOR, u.SENSOR, u.GROUP:
 		//Check if Parent ID is valid
 		//returns a map[string]interface{} to hold parent entity
 		//if parent found
 		r, ok := validateParent(u.EntityToString(entity), entity, t)
 		if !ok {
 			return r, ok
+		} else if r["hierarchyName"] != nil {
+			t["hierarchyName"] = r["hierarchyName"].(string) + "." + t["name"].(string)
+		} else {
+			println("WARN: Unable to set hierarchyName")
 		}
 
 		if entity < u.AC || entity == u.PWRPNL ||
 			entity == u.GROUP || entity == u.ROOMTMPL ||
-			entity == u.OBJTMPL || entity == u.CORIDOR {
+			entity == u.OBJTMPL || entity == u.CORRIDOR {
 			if _, ok := t["attributes"]; !ok {
 				return u.Message(false, "Attributes should be on the payload"), false
 			} else {
@@ -296,158 +382,13 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 					return u.Message(false, "Attributes should be a JSON Dictionary"), false
 				} else {
 					switch entity {
-					case u.TENANT:
-						if _, ok := v["color"]; !ok || v["color"] == "" {
-							return u.Message(false,
-								"Color Attribute must be specified on the payload and as a hex string"), false
-						}
-
-						if !IsString(v["color"]) {
-							return u.Message(false,
-								"Color Attribute must be a string (of a hex value)"), false
-						}
-
-						if len(v["color"].(string)) != 6 {
-							return u.Message(false,
-								"Color Attribute must have a length of 6"), false
-						}
-
-						if !IsHexString(v["color"].(string)) {
-							return u.Message(false,
-								"Color Attribute must be a Hex value"), false
-						}
-
-					case u.SITE:
-						if !IsOrientation(v["orientation"], entity) {
-							if v["orientation"] == nil || v["orientation"] == "" {
-								return u.Message(false, "Orientation should be on the payload"), false
-							}
-							return u.Message(false, "Orientation is invalid!"), false
-						}
-
-					case u.BLDG:
-						if v["posXY"] == "" || v["posXY"] == nil {
-							return u.Message(false, "XY coordinates should be on payload"), false
-						}
-
-						if v["posXYUnit"] == "" || v["posXYUnit"] == nil {
-							return u.Message(false, "PositionXYUnit should be on the payload"), false
-						}
-
-						if v["size"] == "" || v["size"] == nil {
-							return u.Message(false, "Invalid building size on the payload"), false
-						}
-
-						if v["sizeUnit"] == "" || v["sizeUnit"] == nil {
-							return u.Message(false, "Building size unit should be on the payload"), false
-						}
-
-						if v["height"] == "" || v["height"] == nil {
-							return u.Message(false, "Object Height should be on payload"), false
-						}
-
-						if v["heightUnit"] == "" || v["heightUnit"] == nil {
-							return u.Message(false, "Building Height unit should be on the payload"), false
-						}
-
-					case u.ROOM:
-						if v["posXY"] == "" || v["posXY"] == nil {
-							return u.Message(false, "XY coordinates should be on payload"), false
-						}
-
-						if v["posXYUnit"] == "" || v["posXYUnit"] == nil {
-							return u.Message(false, "PositionXYUnit should be on the payload"), false
-						}
-
-						switch v["floorUnit"] {
-						case "f", "m", "t":
-						case "", nil:
-							return u.Message(false, "floorUnit should be on the payload"), false
-						default:
-							return u.Message(false, "floorUnit is invalid!"), false
-
-						}
-
-						//Check Orientation
-						if !IsNonStdOrientation(v["orientation"], entity) {
-							if v["orientation"] == nil || v["orientation"] == "" {
-								return u.Message(false, "Orientation should be on the payload"), false
-							}
-							return u.Message(false, "Orientation is invalid!"), false
-						}
-
-						if v["size"] == "" || v["size"] == nil {
-							return u.Message(false, "Invalid size on the payload"), false
-						}
-
-						if v["sizeUnit"] == "" || v["sizeUnit"] == nil {
-							return u.Message(false, "Room size unit should be on the payload"), false
-						}
-
-						if v["height"] == "" || v["height"] == nil {
-							return u.Message(false, "Object Height should be on payload"), false
-						}
-
-						if v["heightUnit"] == "" || v["heightUnit"] == nil {
-							return u.Message(false, "Room Height unit should be on the payload"), false
-						}
-
 					case u.RACK:
-						if v["posXYZ"] == "" || v["posXYZ"] == nil {
-							return u.Message(false, "XYZ coordinates should be on payload"), false
-						} else {
-							//check if format is Vector3, example {\"x\":25,\"y\":29.4,\"z\":0}"
-							var posXYZ map[string]float32
-							err := json.Unmarshal([]byte(v["posXYZ"].(string)), &posXYZ)
-							if err != nil {
-								return u.Message(false, "Invalid posXYZ on payload: "+err.Error()), false
-							}
-
-							if len(posXYZ) != 3 {
-								return u.Message(false, "Invalid posXYZ on payload: should be Vector3 "), false
-							}
-
-							for _, key := range []string{"x", "y", "z"} {
-								if _, ok = posXYZ[key]; !ok {
-									return u.Message(false, "Invalid posXYZ on payload: missing "+key), false
-								}
-							}
-						}
-
-						if v["posXYUnit"] == "" || v["posXYUnit"] == nil {
-							return u.Message(false, "PositionXYUnit should be on the payload"), false
-						}
-
-						//Check Orientation
-						if !IsOrientation(v["orientation"], entity) {
-							if v["orientation"] == nil || v["orientation"] == "" {
-								return u.Message(false, "Orientation should be on the payload"), false
-							}
-							return u.Message(false, "Orientation is invalid!"), false
-						}
-
-						if v["size"] == "" || v["size"] == nil {
-							return u.Message(false, "Invalid size on the payload"), false
-						}
-
-						if v["sizeUnit"] == "" || v["sizeUnit"] == nil {
-							return u.Message(false, "Rack size unit should be on the payload"), false
-						}
-
-						if v["height"] == "" || v["height"] == nil {
-							return u.Message(false, "Object Height should be on payload"), false
-						}
-
-						if v["heightUnit"] == "" || v["heightUnit"] == nil {
-							return u.Message(false, "Rack Height unit should be on the payload"), false
-						}
-
 						//Ensure the name is also unique among corridors
 						req := bson.M{"name": t["name"].(string)}
-						nameCheck, _ := GetManyEntities("corridor", req, nil)
+						nameCheck, _ := GetManyEntities("corridor", req, u.RequestFilters{})
 						if nameCheck != nil {
 							if len(nameCheck) != 0 {
-								msg := "Rack name name must be unique among corridors and racks"
+								msg := "Rack name must be unique among corridors and racks"
 								if nameCheck != nil {
 									println(nameCheck[0]["name"].(string))
 								}
@@ -457,118 +398,26 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 						}
 
 					case u.DEVICE:
-						if !IsOrientation(v["orientation"], entity) {
-							if v["orientation"] == nil || v["orientation"] == "" {
-								return u.Message(false, "Orientation should be on the payload"), false
-							}
-							return u.Message(false, "Orientation is invalid!"), false
-						}
-
-						if v["size"] == "" || v["size"] == nil {
-							return u.Message(false, "Invalid size on the payload"), false
-						}
-
-						if v["sizeUnit"] == "" || v["sizeUnit"] == nil {
-							return u.Message(false, "Device size unit should be on the payload"), false
-						}
-
-						if v["height"] == "" || v["height"] == nil {
-							return u.Message(false, "Object Height should be on payload"), false
-						}
-
-						if v["heightUnit"] == "" || v["heightUnit"] == nil {
-							return u.Message(false, "Device Height unit should be on the payload"), false
-						}
-
-						if !IsFloat(v["heightU"]) && !IsInt(v["heightU"]) &&
-							!IsString(v["heightU"]) {
-							return u.Message(false,
-								"Please provide a numerical value for heightU"), false
-						}
-
-						if IsString(v["heightU"]) {
-							if v["heightU"].(string) <= "0" {
-								return u.Message(false,
-									"heightU must be greater than 0"), false
+						v := t["attributes"].(map[string]interface{})
+						if HasMapStringKey(v, "slot") {
+							if r, status := CheckRackSlotIsFree(v["slot"],
+								v["parentId"].(string)); !status {
+								return r, status
 							}
 
-							if StrToFloat(v["heightU"].(string)) == 0 {
-								return u.Message(false,
-									"Please provide a numerical value for heightU"), false
-							}
+						} else {
+							//Get Floats from sizeU and height U START
+							height := GetFloatFromStrOrInf(v["heightU"])
+							size := GetFloatFromStrOrInf(v["sizeU"])
 
-						}
-
-						if !IsString(v["sizeU"]) && !IsInt(v["sizeU"]) &&
-							!IsFloat(v["sizeU"]) {
-
-							return u.Message(false,
-								"Please provide a numerical string or"+
-									" int value for sizeU of the device"), false
-						}
-
-						if IsString(v["sizeU"]) {
-							if v["sizeU"].(string) <= "0" {
-								return u.Message(false,
-									"sizeU must be greater than 0"), false
-							}
-
-							if StrToFloat(v["sizeU"].(string)) == 0 {
-								return u.Message(false,
-									"Please provide a numerical value for sizeU"), false
+							if r, status := RackSpaceChecker(height,
+								size, t["parentId"].(string)); !status {
+								return r, status
 							}
 						}
 
-						if side, ok := v["side"]; ok {
-							switch side {
-							case "front", "rear", "frontflipped", "rearflipped":
-							default:
-								msg := "The 'Side' value (if given) must be one of" +
-									"the given values: front, rear, frontflipped, rearflipped"
-								return u.Message(false, msg), false
-							}
-						}
-
-						//Need to ensure space on a rack for devices
-						if entity == u.DEVICE {
-							v := t["attributes"].(map[string]interface{})
-							if HasMapStringKey(v, "slot") {
-								if r, status := CheckRackSlotIsFree(v["slot"],
-									v["parentId"].(string)); !status {
-									return r, status
-								}
-
-							} else {
-								//Get Floats from sizeU and height U START
-								height := GetFloatFromStrOrInf(v["heightU"])
-								size := GetFloatFromStrOrInf(v["sizeU"])
-
-								if r, status := RackSpaceChecker(height,
-									size, t["parentId"].(string)); !status {
-									return r, status
-								}
-							}
-						}
-
-					case u.CORIDOR:
-						//Ensure the temperature and 2 racks are valid
-						if !IsString(v["temperature"]) {
-							msg := "The temperature must be on the " +
-								"payload and can only be a string value 'cold' or 'warm'"
-							return u.Message(false, msg), false
-						}
-						if !StringIsAmongValues(v["temperature"].(string), []string{"warm", "cold"}) {
-							msg := "The temperature must be on the " +
-								"payload and can only be 'cold' or 'warm'"
-							return u.Message(false, msg), false
-						}
-
-						if !IsString(v["content"]) {
-							msg := "The racks must be on the payload and have the key:" +
-								"'content' "
-							return u.Message(false, msg), false
-						}
-
+					case u.CORRIDOR:
+						//Ensure the 2 racks are valid
 						racks := strings.Split(v["content"].(string), ",")
 						if len(racks) != 2 {
 							msg := "2 racks separated by a comma must be on the payload"
@@ -582,7 +431,7 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 
 						//Ensure the name is also unique among racks
 						req := bson.M{"name": t["name"].(string)}
-						nameCheck, _ := GetManyEntities("rack", req, nil)
+						nameCheck, _ := GetManyEntities("rack", req, u.RequestFilters{})
 						if nameCheck != nil {
 							if len(nameCheck) != 0 {
 								msg := "Corridor name must be unique among corridors and racks"
@@ -596,7 +445,7 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 						orReq := bson.A{bson.D{{"name", racks[0]}}, bson.D{{"name", racks[1]}}}
 
 						filter = bson.M{"parentId": t["parentId"], "$or": orReq}
-						ans, e := GetManyEntities("rack", filter, nil)
+						ans, e := GetManyEntities("rack", filter, u.RequestFilters{})
 						if e != "" {
 							msg := "The racks you specified were not found." +
 								" Please verify your input and try again"
@@ -632,13 +481,6 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 						}
 
 					case u.GROUP:
-						if !IsString(v["content"]) {
-							msg := "The objects to be grouped must be on the payload," +
-								" separated by a comma and have the key:" +
-								"'content' "
-							return u.Message(false, msg), false
-						}
-
 						objects := strings.Split(v["content"].(string), ",")
 						if len(objects) <= 1 {
 							if objects[0] == "" {
@@ -664,7 +506,7 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 
 						//If parent is rack, retrieve devices
 						if r["parent"].(string) == "rack" {
-							ans, ok := GetManyEntities("device", filter, nil)
+							ans, ok := GetManyEntities("device", filter, u.RequestFilters{})
 							if ok != "" {
 								return u.Message(false, ok), false
 							}
@@ -677,12 +519,12 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 						} else if r["parent"].(string) == "room" {
 
 							//If parent is room, retrieve corridors and racks
-							corridors, e1 := GetManyEntities("corridor", filter, nil)
+							corridors, e1 := GetManyEntities("corridor", filter, u.RequestFilters{})
 							if e1 != "" {
 								return u.Message(false, e1), false
 							}
 
-							racks, e2 := GetManyEntities("rack", filter, nil)
+							racks, e2 := GetManyEntities("rack", filter, u.RequestFilters{})
 							if e2 != "" {
 								return u.Message(false, e1), false
 							}
@@ -697,153 +539,9 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 				}
 			}
 		}
-	case u.ROOMTMPL, u.OBJTMPL:
-		if t["slug"] == "" || t["slug"] == nil {
-			return u.Message(false, "Slug should be on payload"), false
-		}
-
-		if _, ok := t["colors"]; !ok {
-			return u.Message(false,
-				"Colors should be on payload"), false
-		}
-
-		if entity == u.OBJTMPL {
-			if _, ok := t["description"]; !ok {
-				return u.Message(false,
-					"Description should be on payload"), false
-			}
-
-			/*if _, ok := t["category"]; !ok {
-				return u.Message(false,
-					"Category should be on payload"), false
-			}*/
-
-			if _, ok := t["sizeWDHmm"]; !ok {
-				return u.Message(false,
-					"Size,Width,Depth (mm) Array should be on payload"), false
-			}
-
-			if t["fbxModel"] == nil {
-				return u.Message(false,
-					"fbxModel should be on payload"), false
-			}
-
-			if _, ok := t["attributes"]; !ok {
-				return u.Message(false,
-					"Attributes should be on payload"), false
-			}
-
-			if _, ok := t["slots"]; !ok {
-				return u.Message(false,
-					"slots should be on payload"), false
-			}
-
-		} else { //u.ROOMTMPL
-			if _, ok := t["orientation"]; !ok {
-				return u.Message(false,
-					"Orientation should be on payload"), false
-			}
-
-			if _, ok := t["sizeWDHm"]; !ok {
-				return u.Message(false,
-					"Size,Width,Depth Array should be on payload"), false
-			}
-
-			if _, ok := t["technicalArea"]; !ok {
-				return u.Message(false,
-					"TechnicalArea should be on payload"), false
-			}
-
-			if _, ok := t["reservedArea"]; !ok {
-				return u.Message(false,
-					"ReservedArea should be on payload"), false
-			}
-
-			if _, ok := t["separators"]; !ok {
-				return u.Message(false,
-					"Separators should be on payload"), false
-			}
-
-			if _, ok := t["tiles"]; !ok {
-				return u.Message(false,
-					"Tiles should be on payload"), false
-			}
-		}
-
-	case u.BLDGTMPL:
-		if t["slug"] == "" || t["slug"] == nil {
-			return u.Message(false, "Slug should be on payload"), false
-		}
-
-		if t["orientation"] == "" || t["orientation"] == nil {
-			return u.Message(false, "Orientation should be on payload"), false
-		}
-
-		if !IsOrientation(t["orientation"], u.BLDGTMPL) {
-			return u.Message(false, "Orientation is invalid!"), false
-		}
-
-		if !IsInfArr(t["sizeWDHm"]) {
-			return u.Message(false,
-				"Please provide the size as a 3 numerical element array"), false
-		}
-
-		if len(t["sizeWDHm"].([]interface{})) != 3 {
-			return u.Message(false,
-				"The size can only have 3 numerical elements"), false
-		}
-
-		for _, elt := range t["sizeWDHm"].([]interface{}) {
-			if !IsInt(elt) && !IsFloat(elt) {
-				return u.Message(false,
-					"An element in the size was not numerical!"), false
-			}
-		}
-
-		if !IsInfArr(t["sizeWDHm"]) {
-			return u.Message(false,
-				"Please provide the size as a 3 numerical element array"), false
-		}
-
-		if len(t["sizeWDHm"].([]interface{})) != 3 {
-			return u.Message(false,
-				"The size can only have 3 numerical elements"), false
-		}
-
-		if !IsInfArr(t["vertices"]) {
-			return u.Message(false,
-				"Please provide an array of 2 element (int) array(s) for the vertices"), false
-		}
-
-		for _, arr := range t["vertices"].([]interface{}) {
-			if !IsInfArr(arr) {
-				return u.Message(false,
-					"An element in the vertices array was not an array!"), false
-			}
-
-			if len(arr.([]interface{})) != 2 {
-				return u.Message(false,
-					"An element in the vertices array does not have length of 2"), false
-			}
-
-			for i, element := range arr.([]interface{}) {
-				if !IsFloat(element) {
-					return u.Message(false,
-						"All arrays in the vertices must have integers and be of length 2"), false
-				}
-				//Since ints are being interpreted as floats
-				//we can just truncate all floats for now as a compromise
-				arr.([]interface{})[i] = int(element.(float64))
-			}
-		}
 
 	case u.STRAYDEV, u.STRAYSENSOR:
 		//Check for parent if PID provided
-
-		if t["name"] == nil || t["name"] == "" {
-			return u.Message(false, "Please provide a valid name"), false
-		}
-
 		//Need to check for uniqueness before inserting
 		//this is helpful for the validation endpoints
 		ctx, cancel := u.Connect()
@@ -863,14 +561,6 @@ func ValidateEntity(entity int, t map[string]interface{}) (map[string]interface{
 	return u.Message(true, "success"), true
 }
 
-// Ensures that the attrs of an entity are valid
-// This a func stub from the previous deprecated 'slotValidation'
-// branch. This is meant to encapsulate all the Entity checking
-// TODO: Complete this when the need arises
-func CheckEntityForAttrs(entity int, t map[string]interface{}) (map[string]interface{}, bool) {
-	return nil, false
-}
-
 // This will check if a device can be inserted in a rack at a certain 'U'
 // No consideration for devices other than 'U' units at this time
 func RackSpaceChecker(wantedHeight, wantedSize float64, pid string) (map[string]interface{}, bool) {
@@ -880,7 +570,7 @@ func RackSpaceChecker(wantedHeight, wantedSize float64, pid string) (map[string]
 
 	//Get the Rack block
 	parentID, _ := primitive.ObjectIDFromHex(pid)
-	rack, err1 := GetEntity(bson.M{"_id": parentID}, "rack")
+	rack, err1 := GetEntity(bson.M{"_id": parentID}, "rack", u.RequestFilters{})
 	if err1 != "" || rack == nil {
 		//The device already had a valid parent, so this
 		//case can only mean that it is a subdevice
@@ -906,7 +596,7 @@ func RackSpaceChecker(wantedHeight, wantedSize float64, pid string) (map[string]
 	}
 
 	//Get the Devices of the Rack
-	devs, err := GetManyEntities("device", req, nil)
+	devs, err := GetManyEntities("device", req, u.RequestFilters{})
 	if devs == nil {
 		println("DEBUG err:", err)
 		return u.Message(false, "Internal Error"), false
@@ -918,10 +608,7 @@ func RackSpaceChecker(wantedHeight, wantedSize float64, pid string) (map[string]
 
 		//Ensure every device is comparable
 		//we have to check that the attributes have valid sizeU and heightU
-		//if _, ok := CheckEntityForAttrs(u.DEVICE, v); !ok {
-		//	println("Error: A device in the server does meet requirements")
-		//	return u.Message(false, "Internal error"), false
-		//}
+		//TODO: Consider validating every device here before proceeding
 
 		//Get the device size and height (loc)
 		lInf = v["attributes"].(map[string]interface{})["heightU"]
@@ -976,7 +663,7 @@ func GetFloatFromStrOrInf(x interface{}) float64 {
 // will check if the slot is free
 func CheckRackSlotIsFree(value interface{}, pid string) (map[string]interface{}, bool) {
 	req := bson.M{"parentId": pid}
-	devs, err := GetManyEntities("device", req, nil)
+	devs, err := GetManyEntities("device", req, u.RequestFilters{})
 	if devs == nil {
 		println("DEBUG err:", err)
 		return nil, false
@@ -1018,146 +705,19 @@ func EnsureUnique(x []string) (string, bool) {
 	return "", true
 }
 
-func StringIsAmongValues(x string, values []string) bool {
-	for i := range values {
-		if x == values[i] {
-			return true
-		}
-	}
-	return false
+func IsFloat(x interface{}) bool {
+	_, ok1 := x.(float32)
+	_, ok2 := x.(float64)
+
+	return ok1 || ok2
 }
 
 func IsString(x interface{}) bool {
-	if _, ok := x.(string); ok {
-		return true
-	}
-	return false
+	_, ok := x.(string)
+	return ok
 }
 
 func IsInt(x interface{}) bool {
-	if _, ok := x.(int); ok {
-		return true
-	}
-	return false
-}
-
-func IsFloat(x interface{}) bool {
-	if _, ok := x.(float64); ok {
-		return true
-	}
-	return false
-}
-
-func IsFloatArr(x interface{}) bool {
-	if _, ok := x.([]float64); ok {
-		return true
-	}
-	return false
-}
-
-func IsInfArr(x interface{}) bool {
-	if _, ok := x.([]interface{}); ok {
-		return true
-	}
-	return false
-}
-
-func IsIntArr(x interface{}) bool {
-	if _, ok := x.([]int); ok {
-		return true
-	}
-	return false
-}
-
-func IsHexString(s string) bool {
-	//Eliminate 'odd length' errors
-	if len(s)%2 != 0 {
-		s = "0" + s
-	}
-
-	_, err := hex.DecodeString(s)
-	return err == nil
-}
-
-func IsOrientation(x interface{}, ent int) bool {
-	if ent == u.SITE {
-		switch x {
-		case "EN", "NW", "WS", "SE", "NE", "SW":
-			return true
-
-		default:
-			return false
-		}
-	}
-
-	if ent == u.BLDGTMPL || ent == u.ROOMTMPL {
-		switch x {
-		case "EN", "NW", "WS", "SE", "NE", "SW",
-			"-E-N", "-E+N", "+E-N", "+E+N", "+N+E",
-			"+N-E", "-N-E", "-N+E",
-			"-N-W", "-N+W", "+N-W", "+N+W",
-			"-W-S", "-W+S", "+W-S", "+W+S",
-			"-S-E", "-S+E", "+S-E", "+S+E":
-			return true
-		default:
-			if !IsString(x) {
-				return false
-			}
-			_, e := strconv.Atoi(x.(string))
-			_, e1 := strconv.ParseFloat(x.(string), 64)
-			return e1 == nil || e == nil
-		}
-	}
-
-	if ent == u.ROOM {
-		switch x {
-		case "EN", "NW", "WS", "SE", "NE", "SW",
-			"-E-N", "-E+N", "+E-N", "+E+N", "+N+E",
-			"+N-E", "-N-E", "-N+E",
-			"-N-W", "-N+W", "+N-W", "+N+W",
-			"-W-S", "-W+S", "+W-S", "+W+S",
-			"-S-E", "-S+E", "+S-E", "+S+E":
-			return true
-		default:
-			return false
-		}
-	}
-
-	if ent == u.RACK {
-		switch x {
-		case "front", "rear", "left", "right":
-			return true
-		default:
-			return false
-		}
-	}
-
-	if ent == u.DEVICE {
-		switch x {
-		case "front", "rear", "frontflipped", "rearflipped":
-			return true
-		default:
-			return false
-		}
-
-	}
-	//Control should not reach here
-	return false
-}
-
-func IsNonStdOrientation(x interface{}, ent int) bool {
-	switch x.(type) {
-	case string:
-		if !IsOrientation(x, ent) {
-			//Check if it is a numerical string
-			_, intErr := strconv.Atoi(x.(string))
-			_, floatErr := strconv.ParseFloat(x.(string), 64)
-			return intErr == nil || floatErr == nil
-		}
-		return true
-	case float64, float32, int:
-		return true
-	default:
-		return false
-	}
+	_, ok := x.(int)
+	return ok
 }

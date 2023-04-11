@@ -29,6 +29,12 @@ import (
 //   required: true
 //   format: password
 //   default: "secret"
+// - name: customer
+//   in: json
+//   description: Name of the the customer
+//   required: true
+//   format: string
+//   default: "ORNESS"
 // responses:
 //     '200':
 //         description: Authenticated
@@ -68,6 +74,8 @@ var CreateAccount = func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		case "clientError":
 			w.WriteHeader(http.StatusBadRequest)
+		case "exists":
+			w.WriteHeader(http.StatusConflict)
 		default:
 			w.WriteHeader(http.StatusCreated)
 		}
